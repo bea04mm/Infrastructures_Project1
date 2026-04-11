@@ -15,10 +15,12 @@ import {
 } from "@mui/material"
 import SearchIcon from "@mui/icons-material/Search"
 import EditIcon from "@mui/icons-material/Edit"
+import DeleteIcon from "@mui/icons-material/Delete"
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore"
 import AddIcon from "@mui/icons-material/Add"
 import Scheduler from "../src"
 import EventModal from "./EventModal"
+import ConfirmModal from "./ConfirmModal"
 
 const API_URL = "http://localhost:8000"
 
@@ -94,6 +96,8 @@ export default function App() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [inlineEditingId, setInlineEditingId] = useState(null)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [deletingEvent, setDeletingEvent] = useState(null)
   const [inlineForm, setInlineForm] = useState({
     name: "",
     start_date: "",
@@ -148,6 +152,16 @@ export default function App() {
       start_date: toLocalInputValue(event.start_date),
       end_date: toLocalInputValue(event.end_date)
     })
+  }
+
+  function openDeleteConfirm(event) {
+    setDeletingEvent(event)
+    setDeleteConfirmOpen(true)
+  }
+
+  function closeDeleteConfirm() {
+    setDeleteConfirmOpen(false)
+    setDeletingEvent(null)
   }
 
   function closeModal() {
@@ -214,6 +228,17 @@ export default function App() {
     cancelInlineEdit()
   }
 
+  async function handleDeleteEvent() {
+    if (!deletingEvent) return
+
+    await fetch(`${API_URL}/events/${deletingEvent.id}`, {
+      method: "DELETE"
+    })
+
+    closeDeleteConfirm()
+    await loadEvents()
+  }
+
   const filteredRawEvents = useMemo(() => {
     const value = query.trim().toLowerCase()
     if (!value) return rawEvents
@@ -265,7 +290,6 @@ export default function App() {
             onClick={openCreateModal}
             sx={{ m: 2, borderRadius: 999 }}
           >
-            Add
           </Button>
         </Box>
 
@@ -383,6 +407,17 @@ export default function App() {
                       >
                         <EditIcon fontSize="small" />
                       </IconButton>
+
+                      <IconButton
+                        size="small"
+                        color="error"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          openDeleteConfirm(event)
+                        }}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
                     </Stack>
                   </Stack>
                 </AccordionSummary>
@@ -450,6 +485,19 @@ export default function App() {
         onChange={updateForm}
         onClose={closeModal}
         onSubmit={handleSubmit}
+      />
+
+      <ConfirmModal
+        open={deleteConfirmOpen}
+        title="Delete event"
+        description={
+          deletingEvent
+            ? `Are you sure you want to delete "${deletingEvent.name}"? This action cannot be undone.`
+            : "Are you sure you want to delete this event?"
+        }
+        confirmLabel="Delete"
+        onClose={closeDeleteConfirm}
+        onConfirm={handleDeleteEvent}
       />
     </Box>
   )

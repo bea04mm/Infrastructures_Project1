@@ -26,9 +26,10 @@ import ToolbarSearchbar from "./ToolbarSeachBar.jsx"
 import DateFnsLocaleContext from "../locales/dateFnsContext"
 
 
-function SchedulerToolbar (props) {
+function SchedulerToolbar({ locale = "en", ...props }) {
+  const safeLocale = (locale || "en").toLowerCase()
+
   const {
-    locale,
     events,
     today,
     switchMode,

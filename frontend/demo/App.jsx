@@ -18,9 +18,11 @@ import EditIcon from "@mui/icons-material/Edit"
 import DeleteIcon from "@mui/icons-material/Delete"
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore"
 import AddIcon from "@mui/icons-material/Add"
+import { useNavigate } from "react-router-dom"
 import Scheduler from "../src"
 import EventModal from "./EventModal"
 import ConfirmModal from "./ConfirmModal"
+import { authHeaders, clearToken } from "./auth"
 
 const API_URL = "http://localhost:8000"
 
@@ -91,6 +93,7 @@ function getDayList(start, end) {
 }
 
 export default function App() {
+  const navigate = useNavigate()
   const [rawEvents, setRawEvents] = useState([])
   const [query, setQuery] = useState("")
   const [modalOpen, setModalOpen] = useState(false)
@@ -114,7 +117,16 @@ export default function App() {
   }, [])
 
   async function loadEvents() {
-    const response = await fetch(`${API_URL}/events`)
+    const response = await fetch(`${API_URL}/events`, {
+      headers: authHeaders()
+    })
+
+    if (response.status === 401) {
+      clearToken()
+      navigate("/login")
+      return
+    }
+
     const data = await response.json()
     setRawEvents(data)
   }
@@ -122,11 +134,7 @@ export default function App() {
   function openCreateModal() {
     setInlineEditingId(null)
     setEditingId(null)
-    setForm({
-      name: "",
-      start_date: "",
-      end_date: ""
-    })
+    setForm({ name: "", start_date: "", end_date: "" })
     setModalOpen(true)
   }
 
@@ -170,11 +178,7 @@ export default function App() {
 
   function cancelInlineEdit() {
     setInlineEditingId(null)
-    setInlineForm({
-      name: "",
-      start_date: "",
-      end_date: ""
-    })
+    setInlineForm({ name: "", start_date: "", end_date: "" })
   }
 
   function updateForm(field, value) {
@@ -186,13 +190,21 @@ export default function App() {
   }
 
   async function saveEvent(eventId, payload, method) {
-    await fetch(eventId ? `${API_URL}/events/${eventId}` : `${API_URL}/events`, {
+    const response = await fetch(eventId ? `${API_URL}/events/${eventId}` : `${API_URL}/events`, {
       method,
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        ...authHeaders()
       },
       body: JSON.stringify(payload)
     })
+
+    if (response.status === 401) {
+      clearToken()
+      navigate("/login")
+      return
+    }
+
     await loadEvents()
   }
 
@@ -231,9 +243,16 @@ export default function App() {
   async function handleDeleteEvent() {
     if (!deletingEvent) return
 
-    await fetch(`${API_URL}/events/${deletingEvent.id}`, {
-      method: "DELETE"
+    const response = await fetch(`${API_URL}/events/${deletingEvent.id}`, {
+      method: "DELETE",
+      headers: authHeaders()
     })
+
+    if (response.status === 401) {
+      clearToken()
+      navigate("/login")
+      return
+    }
 
     closeDeleteConfirm()
     await loadEvents()
@@ -273,23 +292,11 @@ export default function App() {
   }
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3} gap={2}>
-        <Box>
-          <Typography variant="h4" fontWeight={700}>
-            Event Scheduler
-          </Typography>
-        </Box>
-      </Stack>
-
+    <Box sx={{ width: "100%" }}>
       <Paper elevation={2} sx={{ p: 2, mb: 3, borderRadius: 3 }}>
         <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={openCreateModal}
-            sx={{ m: 2, borderRadius: 999 }}
-          >
+          <Button variant="contained" startIcon={<AddIcon />} onClick={openCreateModal} sx={{ m: 2, borderRadius: 999 }}>
+            Add
           </Button>
         </Box>
 
@@ -310,7 +317,7 @@ export default function App() {
         )}
       </Paper>
 
-      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2} gap={2}>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2} gap={2} flexWrap="wrap">
         <Typography variant="h6" fontWeight={700}>
           Events
         </Typography>
@@ -367,17 +374,8 @@ export default function App() {
                   "&.Mui-expanded": { margin: 0 }
                 }}
               >
-                <AccordionSummary
-                  expandIcon={<ExpandMoreIcon />}
-                  sx={{ backgroundColor: "grey.50" }}
-                >
-                  <Stack
-                    direction="row"
-                    justifyContent="space-between"
-                    alignItems="center"
-                    spacing={2}
-                    sx={{ width: "100%" }}
-                  >
+                <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ backgroundColor: "grey.50" }}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={2} sx={{ width: "100%" }}>
                     <Box>
                       <Typography variant="subtitle1" fontWeight={700}>
                         {event.name}

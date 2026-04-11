@@ -19,10 +19,10 @@ import DeleteIcon from "@mui/icons-material/Delete"
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore"
 import AddIcon from "@mui/icons-material/Add"
 import { useNavigate } from "react-router-dom"
-import Scheduler from "../src"
-import EventModal from "./EventModal"
-import ConfirmModal from "./ConfirmModal"
-import { authHeaders, clearToken } from "./auth"
+import Scheduler from "../../src"
+import EventModal from "../components/EventModal"
+import ConfirmModal from "../components/ConfirmModal"
+import { authHeaders, clearToken } from "../auth"
 
 const API_URL = "http://localhost:8000"
 
@@ -96,6 +96,8 @@ export default function App() {
   const navigate = useNavigate()
   const [rawEvents, setRawEvents] = useState([])
   const [query, setQuery] = useState("")
+  const [guestsByEvent, setGuestsByEvent] = useState({})
+  const [guestsLoadingByEvent, setGuestsLoadingByEvent] = useState({})
   const [modalOpen, setModalOpen] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [inlineEditingId, setInlineEditingId] = useState(null)
@@ -129,6 +131,26 @@ export default function App() {
 
     const data = await response.json()
     setRawEvents(data)
+  }
+
+  async function loadGuestsForEvent(eventId) {
+    if (guestsLoadingByEvent[eventId]) return
+
+    setGuestsLoadingByEvent((prev) => ({ ...prev, [eventId]: true }))
+
+    const response = await fetch(`${API_URL}/events/${eventId}/guests`, {
+      headers: authHeaders()
+    })
+
+    if (response.status === 401) {
+      clearToken()
+      navigate("/login")
+      return
+    }
+
+    const data = await response.json()
+    setGuestsByEvent((prev) => ({ ...prev, [eventId]: response.ok ? data : [] }))
+    setGuestsLoadingByEvent((prev) => ({ ...prev, [eventId]: false }))
   }
 
   function openCreateModal() {
@@ -365,6 +387,11 @@ export default function App() {
               <Accordion
                 key={event.id}
                 elevation={0}
+                onChange={(_, expanded) => {
+                  if (expanded) {
+                    loadGuestsForEvent(event.id)
+                  }
+                }}
                 sx={{
                   border: "1px solid",
                   borderColor: "divider",
@@ -429,6 +456,38 @@ export default function App() {
                       <Typography variant="body2">
                         <strong>End:</strong> {formatDateTime(event.end_date)}
                       </Typography>
+
+                      <Accordion elevation={0} sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2 }}>
+                        <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ minHeight: 40 }}>
+                          <Typography variant="body2" fontWeight={600}>
+                            Joined guests ({(guestsByEvent[event.id] || []).length})
+                          </Typography>
+                        </AccordionSummary>
+                        <AccordionDetails>
+                          {guestsLoadingByEvent[event.id] ? (
+                            <Typography variant="body2" color="text.secondary">
+                              Loading guests...
+                            </Typography>
+                          ) : (guestsByEvent[event.id] || []).length === 0 ? (
+                            <Typography variant="body2" color="text.secondary">
+                              No guests joined yet.
+                            </Typography>
+                          ) : (
+                            <Stack spacing={1}>
+                              {(guestsByEvent[event.id] || []).map((guest) => (
+                                <Paper key={guest.id} variant="outlined" sx={{ px: 1.5, py: 1 }}>
+                                  <Typography variant="body2" fontWeight={600}>
+                                    {guest.name}
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary">
+                                    {guest.email}
+                                  </Typography>
+                                </Paper>
+                              ))}
+                            </Stack>
+                          )}
+                        </AccordionDetails>
+                      </Accordion>
                     </Stack>
                   ) : (
                     <Box component="form" onSubmit={handleInlineUpdate}>

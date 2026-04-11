@@ -1,11 +1,12 @@
 import React from "react"
 import ReactDOM from "react-dom"
 import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router-dom"
-import App from "./App"
-import LoginPage from "./LoginPage"
-import RegisterPage from "./RegisterPage"
-import AppHeader from "./AppHeader"
-import AppFooter from "./AppFooter"
+import App from "./pages/App"
+import LoginPage from "./pages/LoginPage"
+import RegisterPage from "./pages/RegisterPage"
+import CaptivePortalPage from "./pages/CaptivePortalPage"
+import AppHeader from "./components/AppHeader"
+import AppFooter from "./components/AppFooter"
 import { clearToken, getToken } from "./auth"
 import { Box, Container } from "@mui/material"
 import "./styles.css"
@@ -36,8 +37,9 @@ ReactDOM.render(
 		<Routes>
 			<Route path="/login" element={<LoginPage />} />
 			<Route path="/register" element={<RegisterPage />} />
-			<Route element={<RequireAuth />}>
-				<Route element={<AppLayout />}>
+			<Route element={<AppLayout />}>
+				<Route path="/portal" element={<CaptivePortalPage />} />
+				<Route element={<RequireAuth />}>
 					<Route path="/*" element={<App />} />
 				</Route>
 			</Route>

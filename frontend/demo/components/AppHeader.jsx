@@ -1,7 +1,7 @@
 import React from "react"
 import { AppBar, Box, IconButton, Toolbar as MuiToolbar, Typography } from "@mui/material"
 import LogoutIcon from "@mui/icons-material/Logout"
-import { getToken } from "./auth"
+import { getToken } from "../auth"
 
 export default function AppHeader({ onLogout }) {
   const isLoggedIn = Boolean(getToken())

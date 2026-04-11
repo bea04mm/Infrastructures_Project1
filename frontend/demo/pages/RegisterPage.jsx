@@ -1,13 +1,12 @@
 import React, { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { Box, Button, Container, Paper, Stack, TextField, Typography } from "@mui/material"
-import { setToken } from "./auth"
 
 const API_URL = "http://localhost:8000"
 
-export default function LoginPage() {
+export default function RegisterPage() {
   const navigate = useNavigate()
-  const [form, setForm] = useState({ email: "", password: "" })
+  const [form, setForm] = useState({ full_name: "", email: "", password: "" })
   const [error, setError] = useState("")
 
   function updateForm(field, value) {
@@ -18,7 +17,7 @@ export default function LoginPage() {
     e.preventDefault()
     setError("")
 
-    const response = await fetch(`${API_URL}/auth/login`, {
+    const response = await fetch(`${API_URL}/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form)
@@ -27,12 +26,11 @@ export default function LoginPage() {
     const data = await response.json()
 
     if (!response.ok) {
-      setError(data.detail || "Login failed")
+      setError(data.detail || "Register failed")
       return
     }
 
-    setToken(data.access_token)
-    navigate("/")
+    navigate("/login")
   }
 
   return (
@@ -42,13 +40,20 @@ export default function LoginPage() {
           <Stack spacing={3} component="form" onSubmit={handleSubmit}>
             <Box>
               <Typography variant="h4" fontWeight={700}>
-                Login
+                Register
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Sign in to manage events.
+                Create your account.
               </Typography>
             </Box>
 
+            <TextField
+              label="Full name"
+              value={form.full_name}
+              onChange={(e) => updateForm("full_name", e.target.value)}
+              required
+              fullWidth
+            />
             <TextField
               label="Email"
               value={form.email}
@@ -74,10 +79,10 @@ export default function LoginPage() {
 
             <Stack direction="row" justifyContent="space-between" alignItems="center">
               <Typography variant="body2">
-                No account? <Link to="/register">Register</Link>
+                Already have an account? <Link to="/login">Login</Link>
               </Typography>
               <Button type="submit" variant="contained">
-                Login
+                Register
               </Button>
             </Stack>
           </Stack>

@@ -18,6 +18,8 @@ app = FastAPI(title="Captive Portal API")
 SECRET_KEY = os.getenv("SECRET_KEY", "change-me-in-production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
+ADMIN_EMAIL = "admin@gmail.com"
+ADMIN_PASSWORD = "admin"
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
@@ -97,12 +99,48 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
 
 
+class PortalJoinRequest(BaseModel):
+    event_id: int
+    name: str
+    email: str
+    accept_terms: bool
+
+
+class GuestResponse(BaseModel):
+    id: int
+    event_id: int
+    name: str
+    email: str
+    joined_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 def verify_password(plain_password: str, password_hash: str) -> bool:
     return pbkdf2_sha256.verify(plain_password, password_hash)
 
 
 def hash_password(password: str) -> str:
     return pbkdf2_sha256.hash(password)
+
+
+def seed_admin_user():
+    db = SessionLocal()
+    try:
+        admin_user = db.query(models.User).filter(models.User.email == ADMIN_EMAIL).first()
+        if admin_user:
+            return
+
+        user = models.User(
+            full_name="Admin",
+            email=ADMIN_EMAIL,
+            password_hash=hash_password(ADMIN_PASSWORD),
+        )
+        db.add(user)
+        db.commit()
+    finally:
+        db.close()
 
 
 def create_access_token(data: dict) -> str:
@@ -131,6 +169,9 @@ def get_current_user(
         raise credentials_exception
 
     return user
+
+
+seed_admin_user()
 
 
 @app.get("/health")
@@ -182,6 +223,71 @@ def list_events(
     current_user=Depends(get_current_user),
 ):
     return db.query(models.Event).order_by(models.Event.start_date.asc()).all()
+
+
+@app.get("/events/public", response_model=list[EventResponse])
+def list_public_events(db: Session = Depends(get_db)):
+    return db.query(models.Event).order_by(models.Event.start_date.asc()).all()
+
+
+@app.post("/portal/join")
+def join_network(payload: PortalJoinRequest, db: Session = Depends(get_db)):
+    if not payload.accept_terms:
+        raise HTTPException(status_code=400, detail="You must accept terms and conditions")
+
+    event = db.query(models.Event).filter(models.Event.id == payload.event_id).first()
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    normalized_email = payload.email.strip().lower()
+    existing_guest = (
+        db.query(models.Guest)
+        .filter(models.Guest.event_id == payload.event_id)
+        .filter(models.Guest.email == normalized_email)
+        .first()
+    )
+
+    if existing_guest:
+        return {
+            "message": "Guest already joined for this event",
+            "event": event.name,
+            "name": existing_guest.name,
+            "email": existing_guest.email,
+        }
+
+    guest = models.Guest(
+        event_id=payload.event_id,
+        name=payload.name.strip(),
+        email=normalized_email,
+        joined_at=datetime.now(timezone.utc),
+    )
+    db.add(guest)
+    db.commit()
+
+    return {
+        "message": "Access request received",
+        "event": event.name,
+        "name": guest.name,
+        "email": guest.email,
+    }
+
+
+@app.get("/events/{event_id}/guests", response_model=list[GuestResponse])
+def list_event_guests(
+    event_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    event = db.query(models.Event).filter(models.Event.id == event_id).first()
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    return (
+        db.query(models.Guest)
+        .filter(models.Guest.event_id == event_id)
+        .order_by(models.Guest.joined_at.desc())
+        .all()
+    )
 
 
 @app.post("/events", response_model=EventResponse)

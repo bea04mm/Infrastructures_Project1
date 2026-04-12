@@ -17,6 +17,20 @@ From project root:
 docker compose up -d --build
 ```
 
+### ExtremeCloudIQ integration (event -> usergroup -> SSID PPSK)
+
+When creating an event (`POST /events`), backend now:
+
+1. Creates a user group with event name (`POST /usergroups`)
+2. Reads current SSID groups (`GET /ssids/{id}`)
+3. Replaces SSID PPSK group list with existing groups + new group (`PUT /ssids/{id}/mode/ppsk`)
+
+Configure these backend environment variables:
+
+- `XIQ_USERNAME`
+- `XIQ_PASSWORD`
+- `XIQ_SSID_ID` (preferred) or `XIQ_SSID_NAME`
+
 ## Frontend routes
 
 Base URL (dev): `http://localhost:5173`

@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from .database import Base, engine, SessionLocal
 from . import models
+from .extremeCloudIQAPI import ExtremeCloudIQAPI
 
 app = FastAPI(title="Event Kiosk API")
 
@@ -50,12 +51,87 @@ Base.metadata.create_all(bind=engine)
 ensure_user_schema()
 
 
+def ensure_events_schema():
+    inspector = inspect(engine)
+    if "events" not in inspector.get_table_names():
+        return
+
+    columns = {column["name"] for column in inspector.get_columns("events")}
+    if "usergroup_id" not in columns:
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE events ADD COLUMN usergroup_id BIGINT"))
+
+
+ensure_events_schema()
+
+
+def ensure_guests_schema():
+    inspector = inspect(engine)
+    if "guests" not in inspector.get_table_names():
+        return
+
+    columns = {column["name"] for column in inspector.get_columns("guests")}
+    if "xiq_end_user_id" not in columns:
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE guests ADD COLUMN xiq_end_user_id BIGINT"))
+
+
+ensure_guests_schema()
+
+
 def get_db():
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
+
+
+def sync_event_usergroup_to_ssid(event_name: str):
+    xiq_username = os.getenv("XIQ_USERNAME")
+    xiq_password = os.getenv("XIQ_PASSWORD")
+    ssid_id = os.getenv("XIQ_SSID_ID")
+    ssid_name = os.getenv("XIQ_SSID_NAME")
+
+    if not xiq_username or not xiq_password:
+        raise HTTPException(
+            status_code=500,
+            detail="ExtremeCloudIQ credentials are not configured (XIQ_USERNAME/XIQ_PASSWORD).",
+        )
+
+    api = ExtremeCloudIQAPI(xiq_username, xiq_password)
+    api.login()
+    if not api.access_token:
+        raise HTTPException(status_code=502, detail="Failed to authenticate with ExtremeCloudIQ.")
+
+    if not ssid_id:
+        if not ssid_name:
+            raise HTTPException(
+                status_code=500,
+                detail="Configure XIQ_SSID_ID or XIQ_SSID_NAME to map event groups to SSID.",
+            )
+        ssid_id = api.get_ssid_id_by_name(ssid_name)
+
+    if not ssid_id:
+        raise HTTPException(status_code=404, detail="Configured SSID not found in ExtremeCloudIQ.")
+
+    group_id = api.get_user_group_id_by_name(event_name)
+    if not group_id:
+        group_id = api.create_user_group(event_name, f"User group for event {event_name}")
+    if not group_id:
+        raise HTTPException(status_code=502, detail="Failed to create ExtremeCloudIQ user group.")
+
+    existing_group_ids = api.get_ssid_user_group_ids(ssid_id)
+    if existing_group_ids is None:
+        raise HTTPException(status_code=502, detail="Failed to read current SSID user groups.")
+
+    all_group_ids = list(dict.fromkeys(existing_group_ids + [group_id]))
+    success = api.configure_ppsk_mode(ssid_id, all_group_ids)
+    if not success:
+        raise HTTPException(status_code=502, detail="Failed to update SSID PPSK user groups.")
+
+    api.logout()
+    return group_id
 
 
 class EventCreate(BaseModel):
@@ -69,6 +145,7 @@ class EventResponse(BaseModel):
     name: str
     start_date: datetime
     end_date: datetime
+    usergroup_id: int | None = None
 
     class Config:
         from_attributes = True
@@ -240,6 +317,8 @@ def join_network(payload: KioskJoinRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Event not found")
 
     normalized_email = payload.email.strip().lower()
+    print(f"[DEBUG] User {normalized_email} attempting to join event {payload.event_id}")
+    
     existing_guest = (
         db.query(models.Guest)
         .filter(models.Guest.event_id == payload.event_id)
@@ -248,6 +327,7 @@ def join_network(payload: KioskJoinRequest, db: Session = Depends(get_db)):
     )
 
     if existing_guest:
+        print(f"[DEBUG] User already registered as guest for this event, returning existing record")
         return {
             "message": "Guest already joined for this event",
             "event": event.name,
@@ -255,10 +335,65 @@ def join_network(payload: KioskJoinRequest, db: Session = Depends(get_db)):
             "email": existing_guest.email,
         }
 
+    if not event.usergroup_id:
+        raise HTTPException(status_code=400, detail="Event is not linked to an ExtremeCloudIQ user group")
+
+    xiq_username = os.getenv("XIQ_USERNAME")
+    xiq_password = os.getenv("XIQ_PASSWORD")
+    if not xiq_username or not xiq_password:
+        raise HTTPException(
+            status_code=500,
+            detail="ExtremeCloudIQ credentials are not configured (XIQ_USERNAME/XIQ_PASSWORD).",
+        )
+
+    api = ExtremeCloudIQAPI(xiq_username, xiq_password)
+    api.login()
+    if not api.access_token:
+        raise HTTPException(status_code=502, detail="Failed to authenticate with ExtremeCloudIQ.")
+
+    end_user_id = api.create_end_user(
+        user_group_id=event.usergroup_id,
+        name=payload.name.strip(),
+        email_address=normalized_email,
+    )
+
+    if not end_user_id:
+        # User already exists, try to associate them with the new usergroup
+        existing_end_user = api.get_end_user_by_username(normalized_email)
+        if existing_end_user:
+            end_user_id = existing_end_user.get("id")
+            existing_group_id = existing_end_user.get("user_group_id")
+            
+            # If user is in a different group, delete and recreate in the new group
+            if str(existing_group_id) != str(event.usergroup_id):
+                if api.delete_end_user(end_user_id):
+                    # Recreate the user in the new group
+                    end_user_id = api.create_end_user(
+                        user_group_id=event.usergroup_id,
+                        name=existing_end_user.get("name"),
+                        email_address=normalized_email,
+                    )
+                    if end_user_id:
+                        print(f"User {normalized_email} moved from group {existing_group_id} to group {event.usergroup_id}")
+                    else:
+                        api.logout()
+                        raise HTTPException(status_code=502, detail="Failed to recreate user in new usergroup.")
+                else:
+                    api.logout()
+                    raise HTTPException(status_code=502, detail="Failed to remove user from old usergroup.")
+            else:
+                print(f"User {normalized_email} already in group {event.usergroup_id}")
+
+    api.logout()
+
+    if not end_user_id:
+        raise HTTPException(status_code=502, detail="Failed to create or associate end user in ExtremeCloudIQ.")
+
     guest = models.Guest(
         event_id=payload.event_id,
         name=payload.name.strip(),
         email=normalized_email,
+        xiq_end_user_id=end_user_id,
         joined_at=datetime.now(timezone.utc),
     )
     db.add(guest)
@@ -296,10 +431,13 @@ def create_event(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    usergroup_id = sync_event_usergroup_to_ssid(payload.name)
+
     event = models.Event(
         name=payload.name,
         start_date=payload.start_date,
         end_date=payload.end_date,
+        usergroup_id=usergroup_id,
     )
     db.add(event)
     db.commit()

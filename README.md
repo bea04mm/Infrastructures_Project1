@@ -1,4 +1,4 @@
-# Captive Portal Project
+# Event Kiosk Project
 
 This project contains a React frontend, a FastAPI backend, and PostgreSQL using Docker Compose.
 
@@ -23,7 +23,7 @@ Base URL (dev): `http://localhost:5173`
 
 - `/login` - login page
 - `/register` - register page
-- `/portal` - public captive portal page (guest join)
+- `/kiosk` - public event kiosk page (guest join)
 - `/` - protected app (scheduler/events management)
 
 ## Backend routes
@@ -47,8 +47,8 @@ Base URL: `http://localhost:8000`
 - `DELETE /events/{event_id}` (JWT required)
 - `GET /events/{event_id}/guests` (JWT required)
 
-### Captive Portal
-- `POST /portal/join` (public)
+### Event Kiosk
+- `POST /kiosk/join` (public)
   - Accepts: `event_id`, `name`, `email`, `accept_terms`
   - Associates guest to event by email (one guest email per event)
 

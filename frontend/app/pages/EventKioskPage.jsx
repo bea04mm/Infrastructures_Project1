@@ -24,7 +24,7 @@ function formatDate(value) {
   }).format(new Date(value))
 }
 
-export default function CaptivePortalPage() {
+export default function EventKioskPage() {
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState("")
@@ -66,7 +66,7 @@ export default function CaptivePortalPage() {
     setMessage("")
     setError("")
 
-    const response = await fetch(`${API_URL}/portal/join`, {
+    const response = await fetch(`${API_URL}/kiosk/join`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -94,7 +94,7 @@ export default function CaptivePortalPage() {
         <Stack spacing={3}>
           <Box>
             <Typography variant="h4" fontWeight={700}>
-              Web Captive Portal
+              Web Event Kiosk
             </Typography>
             <Typography variant="body2" color="text.secondary">
               Select your event and fill in your details to join the network.

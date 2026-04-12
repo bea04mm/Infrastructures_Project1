@@ -1,15 +1,14 @@
-import React from "react"
 import ReactDOM from "react-dom"
 import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router-dom"
 import App from "./pages/App"
 import LoginPage from "./pages/LoginPage"
 import RegisterPage from "./pages/RegisterPage"
-import CaptivePortalPage from "./pages/CaptivePortalPage"
 import AppHeader from "./components/AppHeader"
 import AppFooter from "./components/AppFooter"
 import { clearToken, getToken } from "./auth"
 import { Box, Container } from "@mui/material"
 import "./styles.css"
+import EventKioskPage from "./pages/EventKioskPage"
 
 function RequireAuth() {
 	return getToken() ? <Outlet /> : <Navigate to="/login" replace />
@@ -38,7 +37,7 @@ ReactDOM.render(
 			<Route path="/login" element={<LoginPage />} />
 			<Route path="/register" element={<RegisterPage />} />
 			<Route element={<AppLayout />}>
-				<Route path="/portal" element={<CaptivePortalPage />} />
+				<Route path="/kiosk" element={<EventKioskPage />} />
 				<Route element={<RequireAuth />}>
 					<Route path="/*" element={<App />} />
 				</Route>

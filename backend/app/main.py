@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from .database import Base, engine, SessionLocal
 from . import models
 
-app = FastAPI(title="Captive Portal API")
+app = FastAPI(title="Event Kiosk API")
 
 SECRET_KEY = os.getenv("SECRET_KEY", "change-me-in-production")
 ALGORITHM = "HS256"
@@ -99,7 +99,7 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
 
 
-class PortalJoinRequest(BaseModel):
+class KioskJoinRequest(BaseModel):
     event_id: int
     name: str
     email: str
@@ -230,8 +230,8 @@ def list_public_events(db: Session = Depends(get_db)):
     return db.query(models.Event).order_by(models.Event.start_date.asc()).all()
 
 
-@app.post("/portal/join")
-def join_network(payload: PortalJoinRequest, db: Session = Depends(get_db)):
+@app.post("/kiosk/join")
+def join_network(payload: KioskJoinRequest, db: Session = Depends(get_db)):
     if not payload.accept_terms:
         raise HTTPException(status_code=400, detail="You must accept terms and conditions")
 

@@ -20,7 +20,7 @@ export default function AppHeader({ onLogout }) {
       <MuiToolbar sx={{ justifyContent: "space-between" }}>
         <Box>
           <Typography variant="h6" fontWeight={800}>
-            Captive Portal Scheduler
+            Event Kiosk Scheduler
           </Typography>
           <Typography variant="body2" color="text.secondary">
             Manage your events from one place.

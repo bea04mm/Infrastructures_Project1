@@ -1,4 +1,4 @@
-const TOKEN_KEY = "captivo_token"
+const TOKEN_KEY = "kiosk_token"
 
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY)

@@ -14,7 +14,7 @@ export default function AppFooter() {
         bgcolor: "background.paper"
       }}
     >
-      <Typography variant="body2">Captive Portal Scheduler</Typography>
+      <Typography variant="body2">Event Kiosk Scheduler</Typography>
     </Box>
   )
 }

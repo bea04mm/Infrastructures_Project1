@@ -13,16 +13,16 @@ services:
     ports:
       - "8000:8000"
     environment:
-      DATABASE_URL: postgresql+psycopg2://postgres:postgres@db:5432/captive_portal
+      DATABASE_URL: postgresql+psycopg2://postgres:postgres@db:5432/event_kiosk
     depends_on:
       db:
         condition: service_healthy
 
   db:
     image: postgres:16-alpine
-    container_name: captive_postgres
+    container_name: kiosk_postgres
     environment:
-      POSTGRES_DB: captive_portal
+      POSTGRES_DB: event_kiosk
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
@@ -30,7 +30,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d captive_portal"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d event_kiosk"]
       interval: 5s
       timeout: 5s
       retries: 10

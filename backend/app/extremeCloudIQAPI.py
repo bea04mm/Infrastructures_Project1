@@ -834,3 +834,40 @@ if __name__ == "__main__":
     api.import_ppsk_from_csv(csv_file_path)
 
     api.logout()
+
+    def create_webhook_subscription(self, webhook_url, secret="event-kiosk-webhook"):
+        """Create a webhook subscription for authentication logs"""
+        endpoint = "subscriptions/webhook"
+        data = [
+            {
+                "application": "event-kiosk",
+                "url": webhook_url,
+                "secret": secret,
+                "message_type": "AUTHENTICATION_LOG_ALL"
+            }
+        ]
+        response = self._make_request(endpoint, "POST", data)
+
+        if response.status_code in (200, 201):
+            response_data = response.json()
+            # XIQ returns the subscription ID in the response
+            subscription_id = response_data.get("id") or response_data[0].get("id") if isinstance(response_data, list) else None
+            print(f"Webhook subscription created with ID: {subscription_id}")
+            return subscription_id
+        else:
+            print(f"Failed to create webhook subscription. Status code: {response.status_code}")
+            print(response.text)
+            return None
+
+    def delete_webhook_subscription(self, subscription_id):
+        """Delete a webhook subscription"""
+        endpoint = f"subscriptions/webhook/{subscription_id}"
+        response = self._make_request(endpoint, "DELETE")
+
+        if response.status_code in (200, 201, 204):
+            print(f"Webhook subscription {subscription_id} deleted successfully")
+            return True
+        else:
+            print(f"Failed to delete webhook subscription {subscription_id}. Status code: {response.status_code}")
+            print(response.text)
+            return False

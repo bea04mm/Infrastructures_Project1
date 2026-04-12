@@ -74,9 +74,29 @@ def ensure_guests_schema():
     if "xiq_end_user_id" not in columns:
         with engine.begin() as connection:
             connection.execute(text("ALTER TABLE guests ADD COLUMN xiq_end_user_id BIGINT"))
+    
+    if "is_connected" not in columns:
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE guests ADD COLUMN is_connected INTEGER NOT NULL DEFAULT 0"))
+    
+    if "last_activity_at" not in columns:
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE guests ADD COLUMN last_activity_at TIMESTAMP"))
 
 
 ensure_guests_schema()
+
+
+def ensure_webhook_subscriptions_schema():
+    inspector = inspect(engine)
+    if "webhook_subscriptions" not in inspector.get_table_names():
+        return
+
+    columns = {column["name"] for column in inspector.get_columns("webhook_subscriptions")}
+    # All columns are created initially, nothing to migrate
+
+
+ensure_webhook_subscriptions_schema()
 
 
 def get_db():
@@ -189,6 +209,8 @@ class GuestResponse(BaseModel):
     name: str
     email: str
     joined_at: datetime
+    is_connected: bool = False
+    last_activity_at: datetime | None = None
 
     class Config:
         from_attributes = True
@@ -479,3 +501,107 @@ def delete_event(
     db.commit()
 
     return {"message": "Event deleted successfully"}
+
+
+class WebhookAuthenticationPayload(BaseModel):
+    ownerId: int | None = None
+    userId: int | None = None
+    timeStamp: int | None = None
+    code: int | None = None
+    category: int | None = None
+    description: str | None = None
+    userName: str | None = None
+
+
+@app.post("/webhooks/authentication")
+def handle_authentication_webhook(payload: list[WebhookAuthenticationPayload], db: Session = Depends(get_db)):
+    """
+    Webhook endpoint to receive authentication events from ExtremeCloudIQ.
+    Code 10001 = Login, Code 10002 = Logout
+    """
+    for event in payload:
+        if not event.userName:
+            continue
+        
+        normalized_email = event.userName.strip().lower()
+        
+        # Find the guest by email
+        guest = db.query(models.Guest).filter(models.Guest.email == normalized_email).first()
+        if not guest:
+            print(f"[WEBHOOK] No guest found for email: {normalized_email}")
+            continue
+        
+        # Code 10001 = Login, Code 10002 = Logout
+        if event.code == 10001:
+            guest.is_connected = True
+        elif event.code == 10002:
+            guest.is_connected = False
+        
+        guest.last_activity_at = datetime.fromtimestamp(event.timeStamp / 1000, tz=timezone.utc) if event.timeStamp else datetime.now(timezone.utc)
+        db.commit()
+        print(f"[WEBHOOK] Updated guest {normalized_email}: connected={guest.is_connected}")
+    
+    return {"status": "received"}
+
+
+@app.post("/webhooks/register")
+def register_webhook(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """
+    Register the authentication webhook with ExtremeCloudIQ.
+    This should be called when the dashboard is first loaded.
+    """
+    xiq_username = os.getenv("XIQ_USERNAME")
+    xiq_password = os.getenv("XIQ_PASSWORD")
+    webhook_url = os.getenv("WEBHOOK_URL", "http://localhost:8000/webhooks/authentication")
+    
+    if not xiq_username or not xiq_password:
+        raise HTTPException(
+            status_code=500,
+            detail="ExtremeCloudIQ credentials are not configured"
+        )
+    
+    # Check if webhook is already registered
+    existing_subscription = db.query(models.WebhookSubscription).filter(
+        models.WebhookSubscription.message_type == "AUTHENTICATION_LOG_ALL",
+        models.WebhookSubscription.is_active == True
+    ).first()
+    
+    if existing_subscription:
+        print(f"[WEBHOOK] Webhook already registered with ID: {existing_subscription.xiq_subscription_id}")
+        return {
+            "status": "already_registered",
+            "subscription_id": existing_subscription.xiq_subscription_id
+        }
+    
+    # Create new webhook subscription
+    api = ExtremeCloudIQAPI(xiq_username, xiq_password)
+    api.login()
+    
+    if not api.access_token:
+        raise HTTPException(status_code=502, detail="Failed to authenticate with ExtremeCloudIQ")
+    
+    subscription_id = api.create_webhook_subscription(webhook_url)
+    api.logout()
+    
+    if not subscription_id:
+        raise HTTPException(status_code=502, detail="Failed to create webhook subscription")
+    
+    # Store subscription in database
+    webhook_sub = models.WebhookSubscription(
+        xiq_subscription_id=str(subscription_id),
+        message_type="AUTHENTICATION_LOG_ALL",
+        webhook_url=webhook_url,
+        created_at=datetime.now(timezone.utc),
+        is_active=True
+    )
+    db.add(webhook_sub)
+    db.commit()
+    db.refresh(webhook_sub)
+    
+    return {
+        "status": "registered",
+        "subscription_id": subscription_id
+    }

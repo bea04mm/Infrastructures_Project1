@@ -32,3 +32,16 @@ class Guest(Base):
     email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     xiq_end_user_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True, index=True)
     joined_at: Mapped[str] = mapped_column(DateTime(timezone=True), nullable=False)
+    is_connected: Mapped[bool] = mapped_column(Integer, default=False, nullable=False)
+    last_activity_at: Mapped[str | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class WebhookSubscription(Base):
+    __tablename__ = "webhook_subscriptions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    xiq_subscription_id: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    message_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    webhook_url: Mapped[str] = mapped_column(String(500), nullable=False)
+    created_at: Mapped[str] = mapped_column(DateTime(timezone=True), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Integer, default=True, nullable=False)

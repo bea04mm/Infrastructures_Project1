@@ -116,6 +116,7 @@ export default function App() {
 
   useEffect(() => {
     loadEvents()
+    registerWebhook()
   }, [])
 
   async function loadEvents() {
@@ -131,6 +132,28 @@ export default function App() {
 
     const data = await response.json()
     setRawEvents(data)
+  }
+
+  async function registerWebhook() {
+    try {
+      const response = await fetch(`${API_URL}/webhooks/register`, {
+        method: "POST",
+        headers: authHeaders()
+      })
+
+      if (response.status === 401) {
+        clearToken()
+        navigate("/login")
+        return
+      }
+
+      if (response.ok) {
+        const data = await response.json()
+        console.log("[WEBHOOK] Registration result:", data)
+      }
+    } catch (error) {
+      console.error("[WEBHOOK] Registration error:", error)
+    }
   }
 
   async function loadGuestsForEvent(eventId) {
@@ -475,13 +498,25 @@ export default function App() {
                           ) : (
                             <Stack spacing={1}>
                               {(guestsByEvent[event.id] || []).map((guest) => (
-                                <Paper key={guest.id} variant="outlined" sx={{ px: 1.5, py: 1 }}>
-                                  <Typography variant="body2" fontWeight={600}>
-                                    {guest.name}
-                                  </Typography>
-                                  <Typography variant="caption" color="text.secondary">
-                                    {guest.email}
-                                  </Typography>
+                                <Paper key={guest.id} variant="outlined" sx={{ px: 1.5, py: 1, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                                  <Box>
+                                    <Typography variant="body2" fontWeight={600}>
+                                      {guest.name}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                      {guest.email}
+                                    </Typography>
+                                  </Box>
+                                  <Box
+                                    sx={{
+                                      width: 12,
+                                      height: 12,
+                                      borderRadius: "50%",
+                                      bgcolor: guest.is_connected ? "#2e7d32" : "#d32f2f",
+                                      flexShrink: 0
+                                    }}
+                                    title={guest.is_connected ? "Connected" : "Disconnected"}
+                                  />
                                 </Paper>
                               ))}
                             </Stack>

@@ -315,6 +315,19 @@ class ExtremeCloudIQAPI:
         print(response.text)
         return False
 
+    def delete_user_group(self, user_group_id):
+        """Delete a user group from XIQ"""
+        endpoint = f"usergroups/{user_group_id}"
+        response = self._make_request(endpoint, "DELETE")
+
+        if response.status_code in (200, 201, 204):
+            print(f"Successfully deleted user group ID {user_group_id}")
+            return True
+
+        print(f"Failed to delete user group ID {user_group_id}. Status code: {response.status_code}")
+        print(response.text)
+        return False
+
     def get_end_user_by_username(self, username_or_email):
         endpoint = "endusers?limit=100"
         response = self._make_request(endpoint, "GET")

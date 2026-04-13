@@ -9,10 +9,12 @@ from jose import JWTError, jwt
 from passlib.hash import pbkdf2_sha256
 from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
+from apscheduler.schedulers.background import BackgroundScheduler
 
 from .database import Base, engine, SessionLocal
 from . import models
 from .extremeCloudIQAPI import ExtremeCloudIQAPI
+from .background_jobs import cleanup_expired_events, schedule_event_cleanup, unschedule_event_cleanup
 
 app = FastAPI(title="Event Kiosk API")
 
@@ -273,6 +275,29 @@ def get_current_user(
 seed_admin_user()
 
 
+# Initialize background job scheduler
+def init_scheduler():
+    """Initialize the background job scheduler"""
+    scheduler = BackgroundScheduler()
+    
+    if not scheduler.running:
+        scheduler.start()
+        print("[STARTUP] Background job scheduler initialized")
+    
+    return scheduler
+
+
+scheduler = init_scheduler()
+
+
+@app.on_event("shutdown")
+def shutdown_event():
+    """Stop the scheduler on shutdown"""
+    if scheduler.running:
+        scheduler.shutdown()
+        print("[SHUTDOWN] Background job scheduler stopped")
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -373,60 +398,73 @@ def join_network(payload: KioskJoinRequest, db: Session = Depends(get_db)):
     if not api.access_token:
         raise HTTPException(status_code=502, detail="Failed to authenticate with ExtremeCloudIQ.")
 
-    end_user_id = api.create_end_user(
-        user_group_id=event.usergroup_id,
-        name=payload.name.strip(),
-        email_address=normalized_email,
-    )
+    end_user_id = None
+    try:
+        end_user_id = api.create_end_user(
+            user_group_id=event.usergroup_id,
+            name=payload.name.strip(),
+            email_address=normalized_email,
+        )
 
-    if not end_user_id:
-        # User already exists, try to associate them with the new usergroup
-        existing_end_user = api.get_end_user_by_username(normalized_email)
-        if existing_end_user:
-            end_user_id = existing_end_user.get("id")
-            existing_group_id = existing_end_user.get("user_group_id")
-            
-            # If user is in a different group, delete and recreate in the new group
-            if str(existing_group_id) != str(event.usergroup_id):
-                if api.delete_end_user(end_user_id):
-                    # Recreate the user in the new group
-                    end_user_id = api.create_end_user(
-                        user_group_id=event.usergroup_id,
-                        name=existing_end_user.get("name"),
-                        email_address=normalized_email,
-                    )
-                    if end_user_id:
-                        print(f"User {normalized_email} moved from group {existing_group_id} to group {event.usergroup_id}")
+        if not end_user_id:
+            # User already exists, try to associate them with the new usergroup
+            existing_end_user = api.get_end_user_by_username(normalized_email)
+            if existing_end_user:
+                end_user_id = existing_end_user.get("id")
+                existing_group_id = existing_end_user.get("user_group_id")
+                
+                # If user is in a different group, delete and recreate in the new group
+                if str(existing_group_id) != str(event.usergroup_id):
+                    if api.delete_end_user(end_user_id):
+                        # Recreate the user in the new group
+                        end_user_id = api.create_end_user(
+                            user_group_id=event.usergroup_id,
+                            name=existing_end_user.get("name"),
+                            email_address=normalized_email,
+                        )
+                        if end_user_id:
+                            print(f"User {normalized_email} moved from group {existing_group_id} to group {event.usergroup_id}")
+                        else:
+                            print(f"[ERROR] Failed to recreate user in new usergroup for {normalized_email}")
+                            raise HTTPException(status_code=502, detail="Failed to recreate user in new usergroup.")
                     else:
-                        api.logout()
-                        raise HTTPException(status_code=502, detail="Failed to recreate user in new usergroup.")
+                        print(f"[ERROR] Failed to delete user from old group for {normalized_email}")
+                        raise HTTPException(status_code=502, detail="Failed to remove user from old usergroup.")
                 else:
-                    api.logout()
-                    raise HTTPException(status_code=502, detail="Failed to remove user from old usergroup.")
-            else:
-                print(f"User {normalized_email} already in group {event.usergroup_id}")
+                    print(f"User {normalized_email} already in group {event.usergroup_id}")
 
-    api.logout()
+        if not end_user_id:
+            print(f"[ERROR] Failed to create or get end user ID for {normalized_email}")
+            raise HTTPException(status_code=502, detail="Failed to create or associate end user in ExtremeCloudIQ.")
 
-    if not end_user_id:
-        raise HTTPException(status_code=502, detail="Failed to create or associate end user in ExtremeCloudIQ.")
+        # Now that we have a valid end_user_id in XIQ, create guest record in local DB
+        guest = models.Guest(
+            event_id=payload.event_id,
+            name=payload.name.strip(),
+            email=normalized_email,
+            xiq_end_user_id=end_user_id,
+            joined_at=datetime.now(timezone.utc),
+        )
+        db.add(guest)
+        db.commit()
+        print(f"[SUCCESS] User {normalized_email} created in both XIQ (ID: {end_user_id}) and local DB")
 
-    guest = models.Guest(
-        event_id=payload.event_id,
-        name=payload.name.strip(),
-        email=normalized_email,
-        xiq_end_user_id=end_user_id,
-        joined_at=datetime.now(timezone.utc),
-    )
-    db.add(guest)
-    db.commit()
+        return {
+            "message": "Access request received",
+            "event": event.name,
+            "name": guest.name,
+            "email": guest.email,
+        }
 
-    return {
-        "message": "Access request received",
-        "event": event.name,
-        "name": guest.name,
-        "email": guest.email,
-    }
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        print(f"[ERROR] Exception during join_network for {normalized_email}: {str(e)}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
+    finally:
+        api.logout()
 
 
 @app.get("/events/{event_id}/guests", response_model=list[GuestResponse])
@@ -464,6 +502,10 @@ def create_event(
     db.add(event)
     db.commit()
     db.refresh(event)
+    
+    # Schedule cleanup job for when the event ends
+    schedule_event_cleanup(scheduler, event.id, event.end_date)
+    
     return event
 
 
@@ -484,6 +526,10 @@ def update_event(
 
     db.commit()
     db.refresh(event)
+    
+    # Reschedule cleanup job with the new end time
+    schedule_event_cleanup(scheduler, event.id, event.end_date)
+    
     return event
 
 
@@ -497,10 +543,93 @@ def delete_event(
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
 
+    # Remove scheduled cleanup job if it exists
+    unschedule_event_cleanup(scheduler, event_id)
+    
+    # Delete all guests associated with this event first (due to foreign key constraint)
+    db.query(models.Guest).filter(models.Guest.event_id == event_id).delete()
+    
+    # Delete the event from the database
     db.delete(event)
     db.commit()
+    
+    # Now clean up XIQ resources (remove from SSID, then delete group)
+    xiq_username = os.getenv("XIQ_USERNAME")
+    xiq_password = os.getenv("XIQ_PASSWORD")
+    ssid_id = os.getenv("XIQ_SSID_ID")
+    ssid_name = os.getenv("XIQ_SSID_NAME")
+    
+    if xiq_username and xiq_password and event.usergroup_id:
+        try:
+            api = ExtremeCloudIQAPI(xiq_username, xiq_password)
+            api.login()
+            if api.access_token:
+                # If SSID ID is not set, try to get it by name
+                if not ssid_id and ssid_name:
+                    ssid_id = api.get_ssid_id_by_name(ssid_name)
+                
+                # Remove the user group from the SSID first
+                if ssid_id:
+                    current_group_ids = api.get_ssid_user_group_ids(ssid_id)
+                    if current_group_ids and event.usergroup_id in current_group_ids:
+                        updated_group_ids = [gid for gid in current_group_ids if gid != event.usergroup_id]
+                        if api.configure_ppsk_mode(ssid_id, updated_group_ids):
+                            print(f"[DELETE EVENT] Removed user group {event.usergroup_id} from SSID {ssid_id}")
+                        else:
+                            print(f"[DELETE EVENT] Failed to remove user group {event.usergroup_id} from SSID")
+                
+                # Delete the user group from XIQ
+                if api.delete_user_group(event.usergroup_id):
+                    print(f"[DELETE EVENT] Successfully deleted user group {event.usergroup_id} from XIQ")
+                else:
+                    print(f"[DELETE EVENT] Failed to delete user group {event.usergroup_id} from XIQ")
+                api.logout()
+        except Exception as e:
+            print(f"[DELETE EVENT] Error cleaning up XIQ resources: {str(e)}")
 
     return {"message": "Event deleted successfully"}
+
+
+@app.post("/events/{event_id}/cleanup")
+def cleanup_event_guests(
+    event_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """
+    Manually trigger cleanup of guests and user group for a specific event.
+    Deletes all guests from extremeCloudIQ and removes the user group.
+    """
+    from .background_jobs import cleanup_expired_events_manual
+    
+    event = db.query(models.Event).filter(models.Event.id == event_id).first()
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    
+    success = cleanup_expired_events_manual(db, event_id)
+    
+    if success:
+        return {"message": f"Cleanup completed for event {event.name}", "event_id": event_id}
+    else:
+        raise HTTPException(status_code=500, detail="Cleanup failed for the event")
+
+
+@app.post("/events/cleanup/all")
+def cleanup_all_expired_events(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """
+    Manually trigger cleanup of all expired events.
+    Deletes all guests from extremeCloudIQ for expired events and removes their user groups.
+    """
+    from .background_jobs import cleanup_expired_events
+    
+    try:
+        cleanup_expired_events(db)
+        return {"message": "Cleanup of all expired events completed successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Cleanup failed: {str(e)}")
 
 
 class WebhookAuthenticationPayload(BaseModel):

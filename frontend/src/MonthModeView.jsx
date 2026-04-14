@@ -177,6 +177,7 @@ function MonthModeView (props) {
           key={`item-d-${task?.id}-${rowId}`}
           onClick={e => handleTaskClick(e, task)}
           onDragStart={e => onCellDragStart(e, task, rowId)}
+          className="EventItem"
           sx={{
             width: "100%",
             py: 0,

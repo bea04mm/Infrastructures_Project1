@@ -53,7 +53,11 @@ export default function EventKioskPage() {
       return
     }
 
-    setEvents(data)
+    // Filter out events that have already ended
+    const now = new Date()
+    const activeEvents = data.filter(event => new Date(event.end_date) >= now)
+    
+    setEvents(activeEvents)
     setLoading(false)
   }
 
@@ -65,6 +69,13 @@ export default function EventKioskPage() {
     e.preventDefault()
     setMessage("")
     setError("")
+
+    // Check if selected event has ended
+    const selectedEvent = events.find(event => String(event.id) === form.event_id)
+    if (!selectedEvent || new Date(selectedEvent.end_date) < new Date()) {
+      setError("This event has ended and registrations are no longer available")
+      return
+    }
 
     const response = await fetch(`${API_URL}/kiosk/join`, {
       method: "POST",
@@ -104,16 +115,22 @@ export default function EventKioskPage() {
           {message ? <Alert severity="success">{message}</Alert> : null}
           {error ? <Alert severity="error">{error}</Alert> : null}
 
+          {loading ? (
+            <Alert severity="info">Loading events...</Alert>
+          ) : events.length === 0 ? (
+            <Alert severity="warning">No active events available for registration.</Alert>
+          ) : null}
+
           <Box component="form" onSubmit={handleSubmit}>
             <Stack spacing={2}>
-              <FormControl fullWidth required>
+              <FormControl fullWidth required disabled={loading || events.length === 0}>
                 <InputLabel id="event-select-label">Event</InputLabel>
                 <Select
                   labelId="event-select-label"
                   label="Event"
                   value={form.event_id}
                   onChange={(e) => updateForm("event_id", e.target.value)}
-                  disabled={loading}
+                  disabled={loading || events.length === 0}
                 >
                   {events.map((event) => (
                     <MenuItem key={event.id} value={String(event.id)}>
@@ -129,6 +146,7 @@ export default function EventKioskPage() {
                 onChange={(e) => updateForm("name", e.target.value)}
                 required
                 fullWidth
+                disabled={events.length === 0}
               />
 
               <TextField
@@ -138,6 +156,7 @@ export default function EventKioskPage() {
                 onChange={(e) => updateForm("email", e.target.value)}
                 required
                 fullWidth
+                disabled={events.length === 0}
               />
 
               <FormControlLabel
@@ -145,12 +164,18 @@ export default function EventKioskPage() {
                   <Checkbox
                     checked={form.accept_terms}
                     onChange={(e) => updateForm("accept_terms", e.target.checked)}
+                    disabled={events.length === 0}
                   />
                 }
                 label="I accept the terms and conditions to join the network"
               />
 
-              <Button type="submit" variant="contained" size="large">
+              <Button 
+                type="submit" 
+                variant="contained" 
+                size="large"
+                disabled={loading || events.length === 0 || !form.event_id || !form.name || !form.email || !form.accept_terms}
+              >
                 Join network
               </Button>
             </Stack>

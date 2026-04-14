@@ -16,7 +16,10 @@ function EventItem(props) {
   
   return (
     <Paper
-      sx={sx}
+      sx={{
+        cursor: "pointer",
+        ...sx
+      }}
       draggable
       onClick={onClick}
       onDragStart={onDragStart}

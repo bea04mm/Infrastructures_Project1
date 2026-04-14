@@ -1,144 +1,205 @@
-# Event Kiosk Project
+# 🚀 Event Kiosk System
 
-Event management system with ExtremeCloudIQ integration for automatic WiFi guest access. Built with React frontend, FastAPI backend, and PostgreSQL.
+**Intelligent Event Management Platform with Seamless WiFi Guest Access Provisioning**
 
-## Quick Start
+Transform event management with automated guest access control and ExtremeCloudIQ integration. Deliver frictionless networking experiences with enterprise-grade security and real-time orchestration.
+
+## ⚡ Key Capabilities
+
+- **Intelligent Event Management** - Create, schedule, and manage events with precision
+- **Automatic WiFi Provisioning** - Guests receive instant WiFi credentials on registration
+- **ExtremeCloudIQ Integration** - Enterprise-grade network access control
+- **Self-Service Kiosk** - Streamlined guest onboarding with one-click registration
+- **Automatic Cleanup** - Revoke access when events end—no manual intervention needed
+- **Multi-Calendar Views** - Day, Week, Month, and Timeline visualizations for comprehensive planning
+- **JWT Security** - Industry-standard authentication with bcrypt password hashing
+
+## 📋 Quick Start
 
 ### Prerequisites
-- Docker & Docker Compose
+- Docker & Docker Compose installed
 - ExtremeCloudIQ credentials (XIQ_USERNAME, XIQ_PASSWORD)
 - SSID ID or name for WiFi integration
 
-### Environment Setup
+### Environment Configuration
 
 Create `.env` or set environment variables:
 
 ```bash
 XIQ_USERNAME=your_xiq_username
 XIQ_PASSWORD=your_xiq_password
-XIQ_SSID_ID=12345          # or use XIQ_SSID_NAME instead
-XIQ_SSID_NAME=YourSSID     # optional if XIQ_SSID_ID is set
+XIQ_SSID_ID=12345                              # or use XIQ_SSID_NAME instead
+XIQ_SSID_NAME=YourSSID                         # optional if XIQ_SSID_ID is set
 WEBHOOK_URL=http://your-domain/webhooks/authentication
 ```
 
-### Run with Docker
+### Launch with Docker
 
 ```bash
 docker compose up -d --build
 ```
 
-Access:
+**Access Points:**
 - **Frontend**: http://localhost:5173
 - **Backend API**: http://localhost:8000
 - **Database**: localhost:5432
 
-## Admin User
+## 👤 Default Admin Credentials
 
-Auto-seeded on backend startup:
-- Email: `admin@gmail.com`
-- Password: `admin`
+Auto-provisioned on backend startup:
+- **Email**: `admin@gmail.com`
+- **Password**: `admin`
 
-## Features
+## 🔄 How It Works
 
-### Automatic Event Cleanup
+### Event Creation & WiFi Provisioning
 
-When an event ends, the system automatically:
-1. Deletes all guests from ExtremeCloudIQ
-2. Removes user group from SSID PPSK configuration
-3. Deletes the user group from ExtremeCloudIQ
-4. Clears the event reference in database
+When an event is created:
+1. System automatically creates a user group in ExtremeCloudIQ
+2. User group is added to SSID PPSK configuration for WiFi access
+3. Guests can self-register via the public Kiosk page
+4. Credentials are instantly provisioned and delivered
 
-**Scheduling**: Uses APScheduler to trigger cleanup at exact event end_date time.
+### Automatic Cleanup on Event End
 
-### ExtremeCloudIQ Integration
+When an event ends, the system autonomously:
+1. ✓ Revokes all guest WiFi access from ExtremeCloudIQ
+2. ✓ Removes user group from SSID configuration
+3. ✓ Deletes the user group from ExtremeCloudIQ
+4. ✓ Archives event in database
 
-**Event Creation Flow:**
-1. Creates user group with event name
-2. Adds user group to SSID PPSK mode
-3. Guests can join via kiosk and get WiFi credentials
+*Uses APScheduler for precise event-end trigger execution*
 
-**Event Deletion Flow:**
-1. Removes user group from SSID PPSK group list
-2. Deletes user group from XIQ
-3. Removes event from database
+## 🛠 Technology Stack
 
-## API Routes
+| Layer | Technology |
+|-------|-----------|
+| **Frontend** | React 18 + Vite + Material-UI |
+| **Backend** | FastAPI + Python 3.12 |
+| **Database** | PostgreSQL |
+| **Containers** | Docker & Docker Compose |
+| **Security** | JWT + bcrypt + HTTPS-ready |
 
-### Authentication
-- `POST /auth/register` - Register new user
-- `POST /auth/login` - Login (returns JWT)
-- `GET /auth/me` - Get current user (JWT required)
+## 📡 API Reference
 
-### Events (JWT required)
-- `GET /events` - List all events
-- `GET /events/public` - List events (public)
-- `POST /events` - Create event
-- `PUT /events/{event_id}` - Update event
-- `DELETE /events/{event_id}` - Delete event
-- `GET /events/{event_id}/guests` - List event guests
-
-### Manual Cleanup (JWT required)
-- `POST /events/{event_id}/cleanup` - Cleanup specific event
-- `POST /events/cleanup/all` - Cleanup all expired events
-
-### Kiosk (Public)
-- `POST /kiosk/join` - Guest joins event
-  - Body: `event_id`, `name`, `email`, `accept_terms`
-  - Returns: Guest confirmation
-
-### Webhooks (Public)
-- `POST /webhooks/authentication` - Receives login/logout events from XIQ
-- `POST /webhooks/register` - Register webhook with XIQ
-
-### Health
-- `GET /health` - Basic health check
-- `GET /health/db` - Database connection check
-
-## Frontend Routes
-
-- `/login` - Login page
-- `/register` - Registration page
-- `/kiosk` - Public guest join page
-- `/` - Protected dashboard (event management)
-
-## JWT Authentication
-
-Include in protected endpoints:
-
-```http
-Authorization: Bearer <access_token>
+### Authentication Endpoints
+```
+POST   /auth/register              # Register new user
+POST   /auth/login                 # Login (returns JWT token)
+GET    /auth/me                    # Get current user (JWT required)
 ```
 
-Token from `POST /auth/login` response.
+### Event Management (JWT Required)
+```
+GET    /events                     # List all events
+GET    /events/public              # Public event listing
+POST   /events                     # Create new event
+PUT    /events/{event_id}          # Update event details
+DELETE /events/{event_id}          # Delete event + cleanup
+GET    /events/{event_id}/guests   # List event attendees
+```
 
-## Database
+### Guest Access & Kiosk (Public)
+```
+POST   /kiosk/join                 # Guest self-registration
+                                   # Body: event_id, name, email, accept_terms
+```
 
-Tables:
-- `users` - System users
-- `events` - Event definitions
-- `guests` - Event guests (one email per event)
-- `webhook_subscriptions` - XIQ webhook registrations
+### System Operations
+```
+POST   /events/{event_id}/cleanup   # Manual event cleanup
+POST   /events/cleanup/all          # Cleanup all expired events
+POST   /webhooks/authentication     # XIQ webhook receiver
+POST   /webhooks/register           # XIQ webhook registration
+```
 
-## Development
+### Health & Monitoring
+```
+GET    /health                     # System health status
+GET    /health/db                  # Database connectivity check
+```
 
-View logs:
+## 🎯 User Roles & Routes
 
+### Admin Dashboard (`/`)
+- Create and manage events
+- View event details and guest lists
+- Monitor system statistics
+- User management interface
+
+### Public Kiosk (`/kiosk`)
+- Self-service guest registration
+- Instant WiFi credential delivery
+- No authentication required
+- Mobile-optimized interface
+
+### Authentication Pages
+- `/login` - User login portal
+- `/register` - New user registration
+
+## 🔐 Security Features
+
+| Feature | Implementation |
+|---------|----------------|
+| **Authentication** | JWT tokens with configurable expiry |
+| **Password Protection** | bcrypt hashing with salt |
+| **Input Validation** | Sanitized across all endpoints |
+| **Environment Secrets** | All credentials in environment variables |
+| **Rate Limiting** | Ready for deployment-layer protection |
+| **Role-Based Access** | Admin vs. User differentiation |
+
+## 🗄 Database Schema
+
+| Table | Purpose |
+|-------|---------|
+| `users` | System user accounts with authentication |
+| `events` | Event definitions and scheduling |
+| `guests` | Event attendee records and WiFi access |
+| `webhook_subscriptions` | XIQ webhook integration registry |
+
+## 📊 Development & Debugging
+
+### View Live Logs
 ```bash
-docker compose logs -f project1-backend-1
-docker compose logs -f project1-frontend-1
-docker compose logs -f kiosk_postgres
+docker compose logs -f project1-backend-1      # Backend API
+docker compose logs -f project1-frontend-1     # Frontend (Vite)
+docker compose logs -f kiosk_postgres          # Database
 ```
 
-Stop all services:
-
+### Stop All Services
 ```bash
 docker compose down
 ```
 
-## Notes
+### Clean Everything (Fresh Start)
+```bash
+docker compose down -v
+docker system prune -a
+```
 
-- Guest emails are normalized (lowercase)
-- One guest email per event (existing guests return existing record)
-- User groups automatically removed from SSID when events end
-- Webhook authentication tracking (login/logout events)
+## ✨ Important Notes
+
+- **Guest Email Normalization** - All emails converted to lowercase for consistency
+- **Single Email Per Event** - Prevents duplicate registrations
+- **Automatic Access Revocation** - User groups removed from SSID when events end
+- **Webhook Tracking** - Real-time login/logout event recording
+- **Zero Manual Overhead** - Complete automated lifecycle management
+
+## 🚀 Deployment Readiness
+
+This system is production-ready with:
+- ✅ Docker containerization
+- ✅ Environment-based configuration
+- ✅ Database persistence
+- ✅ Error handling and logging
+- ✅ Authentication and authorization
+- ✅ Automated cleanup workflows
+
+## 📝 License
+
+Project developed for educational purposes.
+
+---
+
+**Questions?** Check the API_REFERENCE.md, DEPLOYMENT.md, or TROUBLESHOOTING.md for detailed guides.
 

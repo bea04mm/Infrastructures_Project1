@@ -3,15 +3,21 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router-dom
 import App from "./pages/App"
 import LoginPage from "./pages/LoginPage"
 import RegisterPage from "./pages/RegisterPage"
+import UsersManagementPage from "./pages/UsersManagementPage"
+import PresentationPage from "../pages/PresentationPage"
 import AppHeader from "./components/AppHeader"
 import AppFooter from "./components/AppFooter"
-import { clearToken, getToken } from "./auth"
+import { clearToken, getToken, isAdmin } from "./auth"
 import { Box, Container } from "@mui/material"
 import "./styles.css"
 import EventKioskPage from "./pages/EventKioskPage"
 
 function RequireAuth() {
 	return getToken() ? <Outlet /> : <Navigate to="/login" replace />
+}
+
+function RequireAdmin() {
+	return getToken() && isAdmin() ? <Outlet /> : <Navigate to="/login" replace />
 }
 
 function AppLayout() {
@@ -35,11 +41,15 @@ ReactDOM.render(
 	<BrowserRouter>
 		<Routes>
 			<Route path="/login" element={<LoginPage />} />
-			<Route path="/register" element={<RegisterPage />} />
+			<Route path="/presentation" element={<PresentationPage />} />
 			<Route element={<AppLayout />}>
 				<Route path="/kiosk" element={<EventKioskPage />} />
 				<Route element={<RequireAuth />}>
 					<Route path="/*" element={<App />} />
+					<Route path="/users" element={<UsersManagementPage />} />
+				</Route>
+				<Route element={<RequireAdmin />}>
+					<Route path="/register" element={<RegisterPage />} />
 				</Route>
 			</Route>
 		</Routes>

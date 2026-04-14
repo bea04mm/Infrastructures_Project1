@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react"
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Accordion,
   AccordionDetails,
@@ -11,20 +11,20 @@ import {
   Paper,
   Stack,
   TextField,
-  Typography
-} from "@mui/material"
-import SearchIcon from "@mui/icons-material/Search"
-import EditIcon from "@mui/icons-material/Edit"
-import DeleteIcon from "@mui/icons-material/Delete"
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore"
-import AddIcon from "@mui/icons-material/Add"
-import { useNavigate } from "react-router-dom"
-import Scheduler from "../../src"
-import EventModal from "../components/EventModal"
-import ConfirmModal from "../components/ConfirmModal"
-import { authHeaders, clearToken } from "../auth"
+  Typography,
+} from "@mui/material";
+import SearchIcon from "@mui/icons-material/Search";
+import EditIcon from "@mui/icons-material/Edit";
+import DeleteIcon from "@mui/icons-material/Delete";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import AddIcon from "@mui/icons-material/Add";
+import { useNavigate } from "react-router-dom";
+import Scheduler from "../../src";
+import EventModal from "../components/EventModal";
+import ConfirmModal from "../components/ConfirmModal";
+import { authHeaders, clearToken, getCurrentUser } from "../auth";
 
-const API_URL = "http://localhost:8000"
+const API_URL = "http://localhost:8000";
 
 const schedulerState = {
   options: {
@@ -34,7 +34,7 @@ const schedulerState = {
     minWidth: 540,
     maxWidth: 1024,
     minHeight: 540,
-    maxHeight: 720
+    maxHeight: 720,
   },
   alertProps: {
     open: false,
@@ -43,277 +43,285 @@ const schedulerState = {
     message: "",
     showActionButton: false,
     showNotification: false,
-    delay: 1500
+    delay: 1500,
   },
   toolbarProps: {
     showSearchBar: false,
     showSwitchModeButtons: true,
-    showDatePicker: true
-  }
-}
+    showDatePicker: true,
+  },
+};
 
 function formatDateTime(value) {
   return new Intl.DateTimeFormat("en-GB", {
     dateStyle: "medium",
-    timeStyle: "short"
-  }).format(new Date(value))
+    timeStyle: "short",
+  }).format(new Date(value));
 }
 
 function formatTime(value) {
   return new Intl.DateTimeFormat("en-GB", {
     hour: "2-digit",
-    minute: "2-digit"
-  }).format(new Date(value))
+    minute: "2-digit",
+  }).format(new Date(value));
 }
 
 function toLocalInputValue(value) {
-  const date = new Date(value)
-  const offset = date.getTimezoneOffset() * 60000
-  return new Date(date.getTime() - offset).toISOString().slice(0, 16)
+  const date = new Date(value);
+  const offset = date.getTimezoneOffset() * 60000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
 }
 
 function toDateOnly(value) {
-  return new Date(value).toISOString().split("T")[0]
+  return new Date(value).toISOString().split("T")[0];
 }
 
 function getDayList(start, end) {
-  const days = []
-  const cursor = new Date(start)
-  cursor.setHours(0, 0, 0, 0)
+  const days = [];
+  const cursor = new Date(start);
+  cursor.setHours(0, 0, 0, 0);
 
-  const last = new Date(end)
-  last.setHours(0, 0, 0, 0)
+  const last = new Date(end);
+  last.setHours(0, 0, 0, 0);
 
   while (cursor <= last) {
-    days.push(new Date(cursor))
-    cursor.setDate(cursor.getDate() + 1)
+    days.push(new Date(cursor));
+    cursor.setDate(cursor.getDate() + 1);
   }
 
-  return days
+  return days;
 }
 
 export default function App() {
-  const navigate = useNavigate()
-  const [rawEvents, setRawEvents] = useState([])
-  const [query, setQuery] = useState("")
-  const [guestsByEvent, setGuestsByEvent] = useState({})
-  const [guestsLoadingByEvent, setGuestsLoadingByEvent] = useState({})
-  const [modalOpen, setModalOpen] = useState(false)
-  const [editingId, setEditingId] = useState(null)
-  const [inlineEditingId, setInlineEditingId] = useState(null)
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
-  const [deletingEvent, setDeletingEvent] = useState(null)
+  const navigate = useNavigate();
+  const [rawEvents, setRawEvents] = useState([]);
+  const [query, setQuery] = useState("");
+  const [guestsByEvent, setGuestsByEvent] = useState({});
+  const [guestsLoadingByEvent, setGuestsLoadingByEvent] = useState({});
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [inlineEditingId, setInlineEditingId] = useState(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deletingEvent, setDeletingEvent] = useState(null);
   const [inlineForm, setInlineForm] = useState({
     name: "",
     start_date: "",
-    end_date: ""
-  })
+    end_date: "",
+  });
   const [form, setForm] = useState({
     name: "",
     start_date: "",
-    end_date: ""
-  })
+    end_date: "",
+  });
 
   useEffect(() => {
-    loadEvents()
-    registerWebhook()
-  }, [])
+    loadEvents();
+    registerWebhook();
+  }, []);
 
   async function loadEvents() {
     const response = await fetch(`${API_URL}/events`, {
-      headers: authHeaders()
-    })
+      headers: authHeaders(),
+    });
 
     if (response.status === 401) {
-      clearToken()
-      navigate("/login")
-      return
+      clearToken();
+      navigate("/login");
+      return;
     }
 
-    const data = await response.json()
-    setRawEvents(data)
+    const data = await response.json();
+    setRawEvents(data);
   }
 
   async function registerWebhook() {
     try {
       const response = await fetch(`${API_URL}/webhooks/register`, {
         method: "POST",
-        headers: authHeaders()
-      })
+        headers: authHeaders(),
+      });
 
       if (response.status === 401) {
-        clearToken()
-        navigate("/login")
-        return
+        clearToken();
+        navigate("/login");
+        return;
       }
 
       if (response.ok) {
-        const data = await response.json()
-        console.log("[WEBHOOK] Registration result:", data)
+        const data = await response.json();
+        console.log("[WEBHOOK] Registration result:", data);
       }
     } catch (error) {
-      console.error("[WEBHOOK] Registration error:", error)
+      console.error("[WEBHOOK] Registration error:", error);
     }
   }
 
   async function loadGuestsForEvent(eventId) {
-    if (guestsLoadingByEvent[eventId]) return
+    if (guestsLoadingByEvent[eventId]) return;
 
-    setGuestsLoadingByEvent((prev) => ({ ...prev, [eventId]: true }))
+    setGuestsLoadingByEvent((prev) => ({ ...prev, [eventId]: true }));
 
     const response = await fetch(`${API_URL}/events/${eventId}/guests`, {
-      headers: authHeaders()
-    })
+      headers: authHeaders(),
+    });
 
     if (response.status === 401) {
-      clearToken()
-      navigate("/login")
-      return
+      clearToken();
+      navigate("/login");
+      return;
     }
 
-    const data = await response.json()
-    setGuestsByEvent((prev) => ({ ...prev, [eventId]: response.ok ? data : [] }))
-    setGuestsLoadingByEvent((prev) => ({ ...prev, [eventId]: false }))
+    const data = await response.json();
+    setGuestsByEvent((prev) => ({
+      ...prev,
+      [eventId]: response.ok ? data : [],
+    }));
+    setGuestsLoadingByEvent((prev) => ({ ...prev, [eventId]: false }));
   }
 
   function openCreateModal() {
-    setInlineEditingId(null)
-    setEditingId(null)
-    setForm({ name: "", start_date: "", end_date: "" })
-    setModalOpen(true)
+    setInlineEditingId(null);
+    setEditingId(null);
+    setForm({ name: "", start_date: "", end_date: "" });
+    setModalOpen(true);
   }
 
   function openEditModal(eventId) {
-    const event = rawEvents.find((item) => String(item.id) === String(eventId))
-    if (!event) return
+    const event = rawEvents.find((item) => String(item.id) === String(eventId));
+    if (!event) return;
 
-    setInlineEditingId(null)
-    setEditingId(event.id)
+    setInlineEditingId(null);
+    setEditingId(event.id);
     setForm({
       name: event.name,
       start_date: toLocalInputValue(event.start_date),
-      end_date: toLocalInputValue(event.end_date)
-    })
-    setModalOpen(true)
+      end_date: toLocalInputValue(event.end_date),
+    });
+    setModalOpen(true);
   }
 
   function openInlineEdit(event) {
-    setEditingId(null)
-    setInlineEditingId(event.id)
+    setEditingId(null);
+    setInlineEditingId(event.id);
     setInlineForm({
       name: event.name,
       start_date: toLocalInputValue(event.start_date),
-      end_date: toLocalInputValue(event.end_date)
-    })
+      end_date: toLocalInputValue(event.end_date),
+    });
   }
 
   function openDeleteConfirm(event) {
-    setDeletingEvent(event)
-    setDeleteConfirmOpen(true)
+    setDeletingEvent(event);
+    setDeleteConfirmOpen(true);
   }
 
   function closeDeleteConfirm() {
-    setDeleteConfirmOpen(false)
-    setDeletingEvent(null)
+    setDeleteConfirmOpen(false);
+    setDeletingEvent(null);
   }
 
   function closeModal() {
-    setModalOpen(false)
+    setModalOpen(false);
   }
 
   function cancelInlineEdit() {
-    setInlineEditingId(null)
-    setInlineForm({ name: "", start_date: "", end_date: "" })
+    setInlineEditingId(null);
+    setInlineForm({ name: "", start_date: "", end_date: "" });
   }
 
   function updateForm(field, value) {
-    setForm((prev) => ({ ...prev, [field]: value }))
+    setForm((prev) => ({ ...prev, [field]: value }));
   }
 
   function updateInlineForm(field, value) {
-    setInlineForm((prev) => ({ ...prev, [field]: value }))
+    setInlineForm((prev) => ({ ...prev, [field]: value }));
   }
 
   async function saveEvent(eventId, payload, method) {
-    const response = await fetch(eventId ? `${API_URL}/events/${eventId}` : `${API_URL}/events`, {
-      method,
-      headers: {
-        "Content-Type": "application/json",
-        ...authHeaders()
+    const response = await fetch(
+      eventId ? `${API_URL}/events/${eventId}` : `${API_URL}/events`,
+      {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders(),
+        },
+        body: JSON.stringify(payload),
       },
-      body: JSON.stringify(payload)
-    })
+    );
 
     if (response.status === 401) {
-      clearToken()
-      navigate("/login")
-      return
+      clearToken();
+      navigate("/login");
+      return;
     }
 
-    await loadEvents()
+    await loadEvents();
   }
 
   async function handleSubmit(e) {
-    e.preventDefault()
+    e.preventDefault();
 
     await saveEvent(
       editingId,
       {
         name: form.name,
         start_date: new Date(form.start_date).toISOString(),
-        end_date: new Date(form.end_date).toISOString()
+        end_date: new Date(form.end_date).toISOString(),
       },
-      editingId ? "PUT" : "POST"
-    )
+      editingId ? "PUT" : "POST",
+    );
 
-    closeModal()
+    closeModal();
   }
 
   async function handleInlineUpdate(e) {
-    e.preventDefault()
+    e.preventDefault();
 
     await saveEvent(
       inlineEditingId,
       {
         name: inlineForm.name,
         start_date: new Date(inlineForm.start_date).toISOString(),
-        end_date: new Date(inlineForm.end_date).toISOString()
+        end_date: new Date(inlineForm.end_date).toISOString(),
       },
-      "PUT"
-    )
+      "PUT",
+    );
 
-    cancelInlineEdit()
+    cancelInlineEdit();
   }
 
   async function handleDeleteEvent() {
-    if (!deletingEvent) return
+    if (!deletingEvent) return;
 
     const response = await fetch(`${API_URL}/events/${deletingEvent.id}`, {
       method: "DELETE",
-      headers: authHeaders()
-    })
+      headers: authHeaders(),
+    });
 
     if (response.status === 401) {
-      clearToken()
-      navigate("/login")
-      return
+      clearToken();
+      navigate("/login");
+      return;
     }
 
-    closeDeleteConfirm()
-    await loadEvents()
+    closeDeleteConfirm();
+    await loadEvents();
   }
 
   const filteredRawEvents = useMemo(() => {
-    const value = query.trim().toLowerCase()
-    if (!value) return rawEvents
-    return rawEvents.filter((event) => event.name.toLowerCase().includes(value))
-  }, [rawEvents, query])
+    const value = query.trim().toLowerCase();
+    if (!value) return rawEvents;
+    return rawEvents.filter((event) =>
+      event.name.toLowerCase().includes(value),
+    );
+  }, [rawEvents, query]);
 
   const schedulerEvents = useMemo(() => {
     return filteredRawEvents.flatMap((event, index) => {
-      const start = new Date(event.start_date)
-      const end = new Date(event.end_date)
-      const days = getDayList(start, end)
+      const start = new Date(event.start_date);
+      const end = new Date(event.end_date);
+      const days = getDayList(start, end);
 
       return days.map((day, dayIndex) => ({
         id: `${event.id}-${toDateOnly(day)}`,
@@ -326,26 +334,52 @@ export default function App() {
         endHour: dayIndex === days.length - 1 ? formatTime(end) : "23:59",
         date: toDateOnly(day),
         createdAt: new Date(),
-        createdBy: "Backend"
-      }))
-    })
-  }, [filteredRawEvents])
+        createdBy: "Backend",
+      }));
+    });
+  }, [filteredRawEvents]);
 
   function handleTaskClick(task) {
-    const clickedId = task?.eventId ?? task?.id?.split("-")[0] ?? task?.task?.id
-    if (clickedId) openEditModal(clickedId)
+    const clickedId =
+      task?.eventId ?? task?.id?.split("-")[0] ?? task?.task?.id;
+    if (clickedId) openEditModal(clickedId);
   }
 
   return (
     <Box sx={{ width: "100%" }}>
-      <Paper elevation={2} sx={{ p: 2, mb: 3, borderRadius: 3 }}>
-        <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={openCreateModal} sx={{ m: 2, borderRadius: 999 }}>
-            Add
-          </Button>
-        </Box>
+      <Stack spacing={3}>
+        {/* Welcome Header */}
+        <Paper
+          elevation={0}
+          sx={{
+            p: 3,
+            borderRadius: 3,
+            bgcolor: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+            color: "white",
+          }}
+        >
+          <Typography variant="h5" fontWeight={700} sx={{ mb: 1 }}>
+            Welcome back, {getCurrentUser()?.full_name || "User"}!
+          </Typography>
+          <Typography variant="body2" sx={{ opacity: 0.9 }}>
+            You have {filteredRawEvents.length} event
+            {filteredRawEvents.length !== 1 ? "s" : ""} in the system
+          </Typography>
+        </Paper>
 
-        {schedulerEvents.length > 0 && (
+        {/* Scheduler */}
+        <Paper elevation={2} sx={{ p: 2, borderRadius: 3 }}>
+          <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={openCreateModal}
+              sx={{ borderRadius: 999 }}
+            >
+              Add Event
+            </Button>
+          </Box>
+
           <Scheduler
             key={schedulerEvents.map((e) => e.id).join("|")}
             locale="en"
@@ -359,214 +393,296 @@ export default function App() {
             onTaskClick={handleTaskClick}
             onAlertCloseButtonClicked={() => {}}
           />
-        )}
-      </Paper>
+        </Paper>
 
-      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2} gap={2} flexWrap="wrap">
-        <Typography variant="h6" fontWeight={700}>
-          Events
-        </Typography>
-
-        <TextField
-          size="small"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          sx={{
-            width: 340,
-            "& .MuiOutlinedInput-root": {
-              borderRadius: 3,
-              backgroundColor: "background.paper",
-              transition: "all 0.2s ease",
-              "&:hover": {
-                boxShadow: "0 2px 10px rgba(0,0,0,0.06)"
-              },
-              "&.Mui-focused": {
-                boxShadow: "0 4px 14px rgba(25, 118, 210, 0.15)"
-              }
-            }
-          }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon fontSize="small" />
-              </InputAdornment>
-            )
-          }}
-        />
-      </Stack>
-
-      <Stack spacing={1.5}>
-        {filteredRawEvents.length === 0 ? (
-          <Paper sx={{ p: 2, borderRadius: 3 }}>
-            <Typography variant="body2" color="text.secondary">
-              No events found.
+        {/* Events List */}
+        <Box>
+          <Stack
+            direction="row"
+            justifyContent="space-between"
+            alignItems="center"
+            mb={2}
+            gap={2}
+            flexWrap="wrap"
+          >
+            <Typography variant="h6" fontWeight={700}>
+              All Events
             </Typography>
-          </Paper>
-        ) : (
-          filteredRawEvents.map((event, index) => {
-            const isEditing = inlineEditingId === event.id
 
-            return (
-              <Accordion
-                key={event.id}
-                elevation={0}
-                onChange={(_, expanded) => {
-                  if (expanded) {
-                    loadGuestsForEvent(event.id)
-                  }
-                }}
-                sx={{
-                  border: "1px solid",
-                  borderColor: "divider",
-                  borderRadius: 2,
-                  overflow: "hidden",
-                  "&:before": { display: "none" },
-                  "&.Mui-expanded": { margin: 0 }
-                }}
-              >
-                <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ backgroundColor: "grey.50" }}>
-                  <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={2} sx={{ width: "100%" }}>
-                    <Box>
-                      <Typography variant="subtitle1" fontWeight={700}>
-                        {event.name}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {formatDateTime(event.start_date)} → {formatDateTime(event.end_date)}
-                      </Typography>
-                    </Box>
+            <TextField
+              size="small"
+              placeholder="Search events..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              sx={{
+                width: { xs: "100%", sm: 340 },
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: 3,
+                  backgroundColor: "background.paper",
+                  transition: "all 0.2s ease",
+                  "&:hover": {
+                    boxShadow: "0 2px 10px rgba(0,0,0,0.06)",
+                  },
+                  "&.Mui-focused": {
+                    boxShadow: "0 4px 14px rgba(25, 118, 210, 0.15)",
+                  },
+                },
+              }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" />
+                  </InputAdornment>
+                ),
+              }}
+            />
+          </Stack>
 
-                    <Stack direction="row" alignItems="center" spacing={1}>
-                      <Chip
-                        label="Event"
-                        size="small"
-                        sx={{
-                          bgcolor: ["primary.main", "secondary.main", "success.main", "warning.main"][index % 4],
-                          color: "common.white",
-                          fontWeight: 600
-                        }}
-                      />
+          <Stack spacing={1.5}>
+            {filteredRawEvents.length === 0 ? (
+              <Paper sx={{ p: 2, borderRadius: 3 }}>
+                <Typography variant="body2" color="text.secondary">
+                  No events found.
+                </Typography>
+              </Paper>
+            ) : (
+              filteredRawEvents.map((event, index) => {
+                const isEditing = inlineEditingId === event.id;
 
-                      <IconButton
-                        size="small"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          openInlineEdit(event)
-                        }}
+                return (
+                  <Accordion
+                    key={event.id}
+                    elevation={0}
+                    onChange={(_, expanded) => {
+                      if (expanded) {
+                        loadGuestsForEvent(event.id);
+                      }
+                    }}
+                    sx={{
+                      border: "1px solid",
+                      borderColor: "divider",
+                      borderRadius: 2,
+                      overflow: "hidden",
+                      "&:before": { display: "none" },
+                      "&.Mui-expanded": { margin: 0 },
+                    }}
+                  >
+                    <AccordionSummary
+                      expandIcon={<ExpandMoreIcon />}
+                      sx={{ backgroundColor: "grey.50" }}
+                    >
+                      <Stack
+                        direction="row"
+                        justifyContent="space-between"
+                        alignItems="center"
+                        spacing={2}
+                        sx={{ width: "100%" }}
                       >
-                        <EditIcon fontSize="small" />
-                      </IconButton>
-
-                      <IconButton
-                        size="small"
-                        color="error"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          openDeleteConfirm(event)
-                        }}
-                      >
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
-                    </Stack>
-                  </Stack>
-                </AccordionSummary>
-
-                <AccordionDetails sx={{ backgroundColor: "background.paper" }}>
-                  {!isEditing ? (
-                    <Stack spacing={1.5}>
-                      <Typography variant="body2">
-                        <strong>Start:</strong> {formatDateTime(event.start_date)}
-                      </Typography>
-                      <Typography variant="body2">
-                        <strong>End:</strong> {formatDateTime(event.end_date)}
-                      </Typography>
-
-                      <Accordion elevation={0} sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2 }}>
-                        <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ minHeight: 40 }}>
-                          <Typography variant="body2" fontWeight={600}>
-                            Joined guests ({(guestsByEvent[event.id] || []).length})
+                        <Box>
+                          <Typography variant="subtitle1" fontWeight={700}>
+                            {event.name}
                           </Typography>
-                        </AccordionSummary>
-                        <AccordionDetails>
-                          {guestsLoadingByEvent[event.id] ? (
-                            <Typography variant="body2" color="text.secondary">
-                              Loading guests...
-                            </Typography>
-                          ) : (guestsByEvent[event.id] || []).length === 0 ? (
-                            <Typography variant="body2" color="text.secondary">
-                              No guests joined yet.
-                            </Typography>
-                          ) : (
-                            <Stack spacing={1}>
-                              {(guestsByEvent[event.id] || []).map((guest) => (
-                                <Paper key={guest.id} variant="outlined" sx={{ px: 1.5, py: 1, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                                  <Box>
-                                    <Typography variant="body2" fontWeight={600}>
-                                      {guest.name}
-                                    </Typography>
-                                    <Typography variant="caption" color="text.secondary">
-                                      {guest.email}
-                                    </Typography>
-                                  </Box>
-                                  <Box
-                                    sx={{
-                                      width: 12,
-                                      height: 12,
-                                      borderRadius: "50%",
-                                      bgcolor: guest.is_connected ? "#2e7d32" : "#d32f2f",
-                                      flexShrink: 0
-                                    }}
-                                    title={guest.is_connected ? "Connected" : "Disconnected"}
-                                  />
-                                </Paper>
-                              ))}
-                            </Stack>
-                          )}
-                        </AccordionDetails>
-                      </Accordion>
-                    </Stack>
-                  ) : (
-                    <Box component="form" onSubmit={handleInlineUpdate}>
-                      <Stack spacing={2}>
-                        <TextField
-                          label="Event title"
-                          value={inlineForm.name}
-                          onChange={(e) => updateInlineForm("name", e.target.value)}
-                          fullWidth
-                          size="small"
-                        />
-                        <TextField
-                          label="Start date"
-                          type="datetime-local"
-                          value={inlineForm.start_date}
-                          onChange={(e) => updateInlineForm("start_date", e.target.value)}
-                          InputLabelProps={{ shrink: true }}
-                          fullWidth
-                          size="small"
-                        />
-                        <TextField
-                          label="End date"
-                          type="datetime-local"
-                          value={inlineForm.end_date}
-                          onChange={(e) => updateInlineForm("end_date", e.target.value)}
-                          InputLabelProps={{ shrink: true }}
-                          fullWidth
-                          size="small"
-                        />
+                          <Typography variant="body2" color="text.secondary">
+                            {formatDateTime(event.start_date)} →{" "}
+                            {formatDateTime(event.end_date)}
+                          </Typography>
+                        </Box>
 
-                        <Stack direction="row" spacing={1} justifyContent="flex-end">
-                          <Button onClick={cancelInlineEdit}>Cancel</Button>
-                          <Button type="submit" variant="contained">
-                            Update
-                          </Button>
+                        <Stack direction="row" alignItems="center" spacing={1}>
+                          <Chip
+                            label="Event"
+                            size="small"
+                            sx={{
+                              bgcolor: [
+                                "primary.main",
+                                "secondary.main",
+                                "success.main",
+                                "warning.main",
+                              ][index % 4],
+                              color: "common.white",
+                              fontWeight: 600,
+                            }}
+                          />
+
+                          <IconButton
+                            size="small"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openInlineEdit(event);
+                            }}
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openDeleteConfirm(event);
+                            }}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
                         </Stack>
                       </Stack>
-                    </Box>
-                  )}
-                </AccordionDetails>
-              </Accordion>
-            )
-          })
-        )}
+                    </AccordionSummary>
+
+                    <AccordionDetails
+                      sx={{ backgroundColor: "background.paper" }}
+                    >
+                      {!isEditing ? (
+                        <Stack spacing={1.5}>
+                          <Typography variant="body2">
+                            <strong>Start:</strong>{" "}
+                            {formatDateTime(event.start_date)}
+                          </Typography>
+                          <Typography variant="body2">
+                            <strong>End:</strong>{" "}
+                            {formatDateTime(event.end_date)}
+                          </Typography>
+
+                          <Accordion
+                            elevation={0}
+                            sx={{
+                              border: "1px solid",
+                              borderColor: "divider",
+                              borderRadius: 2,
+                            }}
+                          >
+                            <AccordionSummary
+                              expandIcon={<ExpandMoreIcon />}
+                              sx={{ minHeight: 40 }}
+                            >
+                              <Typography variant="body2" fontWeight={600}>
+                                Joined guests (
+                                {(guestsByEvent[event.id] || []).length})
+                              </Typography>
+                            </AccordionSummary>
+                            <AccordionDetails>
+                              {guestsLoadingByEvent[event.id] ? (
+                                <Typography
+                                  variant="body2"
+                                  color="text.secondary"
+                                >
+                                  Loading guests...
+                                </Typography>
+                              ) : (guestsByEvent[event.id] || []).length ===
+                                0 ? (
+                                <Typography
+                                  variant="body2"
+                                  color="text.secondary"
+                                >
+                                  No guests joined yet.
+                                </Typography>
+                              ) : (
+                                <Stack spacing={1}>
+                                  {(guestsByEvent[event.id] || []).map(
+                                    (guest) => (
+                                      <Paper
+                                        key={guest.id}
+                                        variant="outlined"
+                                        sx={{
+                                          px: 1.5,
+                                          py: 1,
+                                          display: "flex",
+                                          alignItems: "center",
+                                          justifyContent: "space-between",
+                                        }}
+                                      >
+                                        <Box>
+                                          <Typography
+                                            variant="body2"
+                                            fontWeight={600}
+                                          >
+                                            {guest.name}
+                                          </Typography>
+                                          <Typography
+                                            variant="caption"
+                                            color="text.secondary"
+                                          >
+                                            {guest.email}
+                                          </Typography>
+                                        </Box>
+                                        <Box
+                                          sx={{
+                                            width: 12,
+                                            height: 12,
+                                            borderRadius: "50%",
+                                            bgcolor: guest.is_connected
+                                              ? "#2e7d32"
+                                              : "#d32f2f",
+                                            flexShrink: 0,
+                                          }}
+                                          title={
+                                            guest.is_connected
+                                              ? "Connected"
+                                              : "Disconnected"
+                                          }
+                                        />
+                                      </Paper>
+                                    ),
+                                  )}
+                                </Stack>
+                              )}
+                            </AccordionDetails>
+                          </Accordion>
+                        </Stack>
+                      ) : (
+                        <Box component="form" onSubmit={handleInlineUpdate}>
+                          <Stack spacing={2}>
+                            <TextField
+                              label="Event title"
+                              value={inlineForm.name}
+                              onChange={(e) =>
+                                updateInlineForm("name", e.target.value)
+                              }
+                              fullWidth
+                              size="small"
+                            />
+                            <TextField
+                              label="Start date"
+                              type="datetime-local"
+                              value={inlineForm.start_date}
+                              onChange={(e) =>
+                                updateInlineForm("start_date", e.target.value)
+                              }
+                              InputLabelProps={{ shrink: true }}
+                              fullWidth
+                              size="small"
+                            />
+                            <TextField
+                              label="End date"
+                              type="datetime-local"
+                              value={inlineForm.end_date}
+                              onChange={(e) =>
+                                updateInlineForm("end_date", e.target.value)
+                              }
+                              InputLabelProps={{ shrink: true }}
+                              fullWidth
+                              size="small"
+                            />
+
+                            <Stack
+                              direction="row"
+                              spacing={1}
+                              justifyContent="flex-end"
+                            >
+                              <Button onClick={cancelInlineEdit}>Cancel</Button>
+                              <Button type="submit" variant="contained">
+                                Update
+                              </Button>
+                            </Stack>
+                          </Stack>
+                        </Box>
+                      )}
+                    </AccordionDetails>
+                  </Accordion>
+                );
+              })
+            )}
+          </Stack>
+        </Box>
       </Stack>
 
       <EventModal
@@ -592,5 +708,5 @@ export default function App() {
         onConfirm={handleDeleteEvent}
       />
     </Box>
-  )
+  );
 }

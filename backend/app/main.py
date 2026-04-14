@@ -47,6 +47,10 @@ def ensure_user_schema():
                     "ALTER TABLE users ADD COLUMN password_hash VARCHAR(255) NOT NULL DEFAULT ''"
                 )
             )
+    
+    if "is_admin" not in columns:
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE users ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT 0"))
 
 
 Base.metadata.create_all(bind=engine)
@@ -188,6 +192,7 @@ class UserResponse(BaseModel):
     id: int
     full_name: str
     email: str
+    is_admin: bool = False
 
     class Config:
         from_attributes = True
@@ -237,6 +242,7 @@ def seed_admin_user():
             full_name="Admin",
             email=ADMIN_EMAIL,
             password_hash=hash_password(ADMIN_PASSWORD),
+            is_admin=True,
         )
         db.add(user)
         db.commit()
@@ -309,23 +315,6 @@ def health_db(db: Session = Depends(get_db)):
     return {"status": "ok", "database": "connected"}
 
 
-@app.post("/auth/register", response_model=UserResponse, status_code=201)
-def register_user(payload: UserCreate, db: Session = Depends(get_db)):
-    existing_user = db.query(models.User).filter(models.User.email == payload.email).first()
-    if existing_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
-
-    user = models.User(
-        full_name=payload.full_name,
-        email=payload.email,
-        password_hash=hash_password(payload.password),
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return user
-
-
 @app.post("/auth/login", response_model=TokenResponse)
 def login_user(payload: UserLogin, db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.email == payload.email).first()
@@ -339,6 +328,76 @@ def login_user(payload: UserLogin, db: Session = Depends(get_db)):
 @app.get("/auth/me", response_model=UserResponse)
 def read_current_user(current_user=Depends(get_current_user)):
     return current_user
+
+
+def get_current_admin(current_user=Depends(get_current_user)):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return current_user
+
+
+@app.post("/auth/register", response_model=UserResponse, status_code=201)
+def register_user(payload: UserCreate, admin_user=Depends(get_current_admin), db: Session = Depends(get_db)):
+    """Register a new user - only admin can create new users"""
+    existing_user = db.query(models.User).filter(models.User.email == payload.email).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    user = models.User(
+        full_name=payload.full_name,
+        email=payload.email,
+        password_hash=hash_password(payload.password),
+        is_admin=False,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@app.get("/admin/users", response_model=list[UserResponse])
+def list_users(admin_user=Depends(get_current_admin), db: Session = Depends(get_db)):
+    """List all users - only admin"""
+    return db.query(models.User).order_by(models.User.email).all()
+
+
+@app.put("/admin/users/{user_id}", response_model=UserResponse)
+def update_user(user_id: int, payload: UserCreate, admin_user=Depends(get_current_admin), db: Session = Depends(get_db)):
+    """Update a user - only admin"""
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    existing_user = db.query(models.User).filter(
+        models.User.email == payload.email,
+        models.User.id != user_id
+    ).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already in use")
+    
+    user.full_name = payload.full_name
+    user.email = payload.email
+    if payload.password:
+        user.password_hash = hash_password(payload.password)
+    
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@app.delete("/admin/users/{user_id}")
+def delete_user(user_id: int, admin_user=Depends(get_current_admin), db: Session = Depends(get_db)):
+    """Delete a user - only admin"""
+    if user_id == admin_user.id:
+        raise HTTPException(status_code=400, detail="Cannot delete your own account")
+    
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    db.delete(user)
+    db.commit()
+    return {"message": "User deleted successfully"}
 
 
 @app.get("/events", response_model=list[EventResponse])

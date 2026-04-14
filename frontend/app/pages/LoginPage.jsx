@@ -1,7 +1,7 @@
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { Link, useNavigate } from "react-router-dom"
-import { Box, Button, Container, Paper, Stack, TextField, Typography } from "@mui/material"
-import { setToken } from "../auth"
+import { Box, Button, Container, Paper, Stack, TextField, Typography, Alert } from "@mui/material"
+import { setToken, setCurrentUser, authHeaders } from "../auth"
 
 const API_URL = "http://localhost:8000"
 
@@ -9,6 +9,7 @@ export default function LoginPage() {
   const navigate = useNavigate()
   const [form, setForm] = useState({ email: "", password: "" })
   const [error, setError] = useState("")
+  const [loading, setLoading] = useState(false)
 
   function updateForm(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }))
@@ -17,22 +18,41 @@ export default function LoginPage() {
   async function handleSubmit(e) {
     e.preventDefault()
     setError("")
+    setLoading(true)
 
-    const response = await fetch(`${API_URL}/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form)
-    })
+    try {
+      const response = await fetch(`${API_URL}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form)
+      })
 
-    const data = await response.json()
+      const data = await response.json()
 
-    if (!response.ok) {
-      setError(data.detail || "Login failed")
-      return
+      if (!response.ok) {
+        setError(data.detail || "Login failed")
+        setLoading(false)
+        return
+      }
+
+      setToken(data.access_token)
+      
+      // Fetch current user info
+      const userResponse = await fetch(`${API_URL}/auth/me`, {
+        headers: authHeaders()
+      })
+      
+      if (userResponse.ok) {
+        const user = await userResponse.json()
+        setCurrentUser(user)
+      }
+      
+      navigate("/")
+    } catch (err) {
+      setError("An error occurred. Please try again.")
+    } finally {
+      setLoading(false)
     }
-
-    setToken(data.access_token)
-    navigate("/")
   }
 
   return (
@@ -42,12 +62,14 @@ export default function LoginPage() {
           <Stack spacing={3} component="form" onSubmit={handleSubmit}>
             <Box>
               <Typography variant="h4" fontWeight={700}>
-                Login
+                Event Kiosk
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Sign in to manage events.
               </Typography>
             </Box>
+
+            {error && <Alert severity="error">{error}</Alert>}
 
             <TextField
               label="Email"
@@ -56,6 +78,7 @@ export default function LoginPage() {
               type="email"
               required
               fullWidth
+              disabled={loading}
             />
             <TextField
               label="Password"
@@ -64,22 +87,18 @@ export default function LoginPage() {
               type="password"
               required
               fullWidth
+              disabled={loading}
             />
 
-            {error ? (
-              <Typography variant="body2" color="error">
-                {error}
-              </Typography>
-            ) : null}
-
             <Stack direction="row" justifyContent="space-between" alignItems="center">
-              <Typography variant="body2">
-                No account? <Link to="/register">Register</Link>
+              <Typography variant="body2" color="text.secondary">
+                Default: admin@gmail.com / admin
               </Typography>
-              <Button type="submit" variant="contained">
-                Login
-              </Button>
             </Stack>
+
+            <Button type="submit" variant="contained" fullWidth disabled={loading}>
+              {loading ? "Signing in..." : "Sign in"}
+            </Button>
           </Stack>
         </Paper>
       </Container>

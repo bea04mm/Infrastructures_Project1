@@ -95,7 +95,7 @@ export default function EventKioskPage() {
       return
     }
 
-    setMessage("You have successfully requested access to the network.")
+    setMessage("You have successfully requested access to the network. Your login credentials have been sent to your email address.")
     setForm({ event_id: "", name: "", email: "", accept_terms: false })
   }
 
@@ -111,6 +111,10 @@ export default function EventKioskPage() {
               Select your event and fill in your details to join the network.
             </Typography>
           </Box>
+
+          <Alert severity="info">
+            After registration, your network credentials will be sent to your email address.
+          </Alert>
 
           {message ? <Alert severity="success">{message}</Alert> : null}
           {error ? <Alert severity="error">{error}</Alert> : null}

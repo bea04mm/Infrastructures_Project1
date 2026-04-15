@@ -550,6 +550,14 @@ def create_event(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    # Check if event with the same name already exists
+    existing_event = db.query(models.Event).filter(models.Event.name == payload.name).first()
+    if existing_event:
+        raise HTTPException(
+            status_code=400,
+            detail=f"An event with the name '{payload.name}' already exists. Please choose a different name."
+        )
+    
     usergroup_id = sync_event_usergroup_to_ssid(payload.name)
 
     event = models.Event(
@@ -578,6 +586,15 @@ def update_event(
     event = db.query(models.Event).filter(models.Event.id == event_id).first()
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
+    
+    # Check if another event with the same name already exists
+    if payload.name != event.name:
+        existing_event = db.query(models.Event).filter(models.Event.name == payload.name).first()
+        if existing_event:
+            raise HTTPException(
+                status_code=400,
+                detail=f"An event with the name '{payload.name}' already exists. Please choose a different name."
+            )
 
     event.name = payload.name
     event.start_date = payload.start_date

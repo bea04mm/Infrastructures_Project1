@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   Box,
   Button,
   IconButton,
@@ -118,6 +119,7 @@ export default function App() {
     start_date: "",
     end_date: "",
   });
+  const [error, setError] = useState("");
 
   useEffect(() => {
     loadEvents();
@@ -254,6 +256,7 @@ export default function App() {
   }
 
   async function saveEvent(eventId, payload, method) {
+    setError("");
     const response = await fetch(
       eventId ? `${API_URL}/events/${eventId}` : `${API_URL}/events`,
       {
@@ -269,6 +272,12 @@ export default function App() {
     if (response.status === 401) {
       clearToken();
       navigate("/login");
+      return;
+    }
+
+    if (!response.ok) {
+      const data = await response.json();
+      setError(data.detail || "An error occurred while saving the event");
       return;
     }
 
@@ -288,7 +297,10 @@ export default function App() {
       editingId ? "PUT" : "POST",
     );
 
-    closeModal();
+    // Only close modal if there's no error
+    if (!error) {
+      closeModal();
+    }
   }
 
   async function handleInlineUpdate(e) {
@@ -304,7 +316,10 @@ export default function App() {
       "PUT",
     );
 
-    cancelInlineEdit();
+    // Only cancel inline edit if there's no error
+    if (!error) {
+      cancelInlineEdit();
+    }
   }
 
   async function handleDeleteEvent() {
@@ -369,6 +384,8 @@ export default function App() {
   return (
     <Box sx={{ width: "100%" }}>
       <Stack spacing={3}>
+        {error && <Alert severity="error" onClose={() => setError("")}>{error}</Alert>}
+        
         {/* Welcome Header */}
         <Paper
           elevation={0}

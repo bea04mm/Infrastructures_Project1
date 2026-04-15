@@ -86,6 +86,12 @@ export default function AppHeader({ onLogout }) {
                   <Divider />
                 </>
               )}
+              <MenuItem onClick={() => handleNavigate("/")}>
+                Events
+              </MenuItem>
+              <MenuItem onClick={() => handleNavigate("/event-logs")}>
+                Attendance Logs
+              </MenuItem>
               <MenuItem onClick={() => handleNavigate("/presentation")}>
                 View Presentation
               </MenuItem>

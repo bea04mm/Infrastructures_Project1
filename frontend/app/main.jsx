@@ -4,6 +4,7 @@ import App from "./pages/App"
 import LoginPage from "./pages/LoginPage"
 import RegisterPage from "./pages/RegisterPage"
 import UsersManagementPage from "./pages/UsersManagementPage"
+import EventLogsPage from "./pages/EventLogsPage"
 import PresentationPage from "../pages/PresentationPage"
 import AppHeader from "./components/AppHeader"
 import AppFooter from "./components/AppFooter"
@@ -47,6 +48,7 @@ ReactDOM.render(
 				<Route element={<RequireAuth />}>
 					<Route path="/*" element={<App />} />
 					<Route path="/users" element={<UsersManagementPage />} />
+					<Route path="/event-logs" element={<EventLogsPage />} />
 				</Route>
 				<Route element={<RequireAdmin />}>
 					<Route path="/register" element={<RegisterPage />} />

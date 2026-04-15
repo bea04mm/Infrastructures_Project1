@@ -475,13 +475,8 @@ def join_network(payload: KioskJoinRequest, db: Session = Depends(get_db)):
     )
 
     if existing_guest:
-        print(f"[DEBUG] User already registered as guest for this event, returning existing record")
-        return {
-            "message": "Guest already joined for this event",
-            "event": event.name,
-            "name": existing_guest.name,
-            "email": existing_guest.email,
-        }
+        print(f"[DEBUG] User already registered as guest for this event, rejecting duplicate registration")
+        raise HTTPException(status_code=409, detail="You have already registered for this event with this email address")
 
     if not event.usergroup_id:
         raise HTTPException(status_code=400, detail="Event is not linked to an ExtremeCloudIQ user group")

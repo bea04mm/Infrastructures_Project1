@@ -105,6 +105,29 @@
   height: auto;
 }
 
+/* QR Code Slide */
+.slide-content--qrcode {
+  max-width: 600px;
+}
+
+.slide-qrcode {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 40px;
+  padding: 30px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(25, 118, 210, 0.15);
+}
+
+.qrcode-image {
+  width: 300px;
+  height: 300px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
 /* Controls */
 .presentation-controls {
   display: flex;

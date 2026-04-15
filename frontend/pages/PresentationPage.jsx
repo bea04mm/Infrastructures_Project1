@@ -209,6 +209,11 @@ const slides = [
       'Capacidade de gerir centenas de eventos em simultâneo',
       'Retorno de investimento rápido através da automatização'
     ]
+  },
+  {
+    title: 'Acede ao Sistema',
+    type: 'qrcode',
+    qrcodeImage: '/qrcode.svg'
   }
 ];
 
@@ -232,11 +237,15 @@ export default function PresentationPage() {
   return (
     <div className="presentation-container">
       <div className="presentation-slide">
-        <div className={`slide-content ${mermaidChart ? 'slide-content--mermaid' : ''}`}>
+        <div className={`slide-content ${mermaidChart ? 'slide-content--mermaid' : ''} ${slide.type === 'qrcode' ? 'slide-content--qrcode' : ''}`}>
           <h1 className="slide-title">{slide.title}</h1>
           {slide.subtitle && <h2 className="slide-subtitle">{slide.subtitle}</h2>}
 
-          {slide.content &&
+          {slide.type === 'qrcode' && slide.qrcodeImage ? (
+            <div className="slide-qrcode">
+              <img src={slide.qrcodeImage} alt="QR Code" className="qrcode-image" />
+            </div>
+          ) : slide.content &&
             (mermaidChart ? (
               <div className="slide-mermaid">
                 <MermaidChart chart={mermaidChart} chartKey={currentSlide} />

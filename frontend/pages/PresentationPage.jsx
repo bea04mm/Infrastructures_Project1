@@ -1,5 +1,57 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import mermaid from 'mermaid';
 import '../styles/presentation.css';
+
+mermaid.initialize({
+  startOnLoad: false,
+  securityLevel: 'loose',
+  theme: 'default'
+});
+
+function MermaidChart({ chart, chartKey }) {
+  const containerRef = useRef(null);
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const renderChart = async () => {
+      if (!containerRef.current) return;
+
+      try {
+        setHasError(false);
+        const renderId = `mermaid-${chartKey}-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
+        const { svg } = await mermaid.render(renderId, chart);
+        if (isMounted && containerRef.current) {
+          containerRef.current.innerHTML = svg;
+        }
+      } catch {
+        if (isMounted) {
+          setHasError(true);
+          if (containerRef.current) {
+            containerRef.current.innerHTML = '';
+          }
+        }
+      }
+    };
+
+    renderChart();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [chart, chartKey]);
+
+  if (hasError) {
+    return (
+      <pre style={{ whiteSpace: 'pre-wrap', textAlign: 'left' }}>
+        Não foi possível renderizar este diagrama Mermaid.
+      </pre>
+    );
+  }
+
+  return <div ref={containerRef} />;
+}
 
 const slides = [
   {
@@ -11,8 +63,8 @@ const slides = [
     content: [
       'Sistema completo de gestão de eventos com auto-registo automático',
       'Integração com ExtremeCloudIQ para controlo de acesso WiFi',
-      'Geração instantânea de credenciais de rede para convidados',
       'Interface pública simples para registo sem necessidade de login',
+      'Geração instantânea de credenciais de rede para convidados',
       'Revogação automática de acesso quando eventos terminam',
       'Dashboard de administração para gestão centralizada'
     ]
@@ -31,14 +83,56 @@ const slides = [
   {
     title: 'Tecnologias Utilizadas',
     content: [
-      'Frontend: React 18 + Vite para interface extremamente rápida',
-      'Backend: FastAPI + Python 3.12 para processamento assíncrono',
-      'Base de Dados: PostgreSQL para armazenamento seguro e performance',
-      'Containerização: Docker e Docker Compose para implantação',
+      'Frontend: React 18 + Vite para uma interface reactiva',
+      'Backend: FastAPI + Python 3.12',
+      'Base de Dados: PostgreSQL para persistencia dos dados',
+      'Containerização: Docker e Docker Compose',
       'API RESTful com autenticação segura e encriptação de senhas',
       'Integração em tempo real com webhooks do ExtremeCloudIQ'
     ]
   },
+
+  /* =========================
+     🔵 FLUXO 1 — MERMAID
+     ========================= */
+  {
+    title: 'Fluxo 1 — Criação de Evento (Provisionamento WiFi)',
+    content: [
+      '```mermaid',
+      'flowchart LR',
+      'A[Admin cria evento] --> B[POST /usergroups]',
+      'B --> C[Criar User Group no ExtremeCloudIQ]',
+      'C --> D[GET /ssids/:ssid_id]',
+      'D --> E[Ler configuração atual do SSID]',
+      'E --> F[Adicionar novo user_group_id à lista]',
+      'F --> G[PUT /ssids/:ssid_id/mode/ppsk]',
+      'G --> H[Atualizar SSID com lista completa]',
+      'H --> I[Evento ativo - convidados podem aceder]',
+      '```'
+    ]
+  },
+
+  /* =========================
+     🔴 FLUXO 2 — MERMAID
+     ========================= */
+  {
+    title: 'Fluxo 2 — Encerramento de Evento (Limpeza Automática)',
+    content: [
+      '```mermaid',
+      'flowchart LR',
+      'A[Evento termina] --> B[GET /ssids/:ssid_id]',
+      'B --> C[Ler configuração atual]',
+      'C --> D[Remover user_group_id do evento]',
+      'D --> E[PUT /ssids/:ssid_id/mode/ppsk]',
+      'E --> F[Atualizar SSID sem grupo do evento]',
+      'F --> G[DELETE /endusers/:id]',
+      'G --> H[Remover todos os convidados]',
+      'H --> I[DELETE /usergroups/:id]',
+      'I --> J[Acesso WiFi revogado]',
+      '```'
+    ]
+  },
+
   {
     title: 'Fluxo Principal de Funcionamento',
     content: [
@@ -130,21 +224,34 @@ export default function PresentationPage() {
   };
 
   const slide = slides[currentSlide];
+  const mermaidChart =
+    slide.content?.[0] === '```mermaid' && slide.content?.[slide.content.length - 1] === '```'
+      ? slide.content.slice(1, -1).join('\n')
+      : null;
 
   return (
     <div className="presentation-container">
       <div className="presentation-slide">
-        <div className="slide-content">
+        <div className={`slide-content ${mermaidChart ? 'slide-content--mermaid' : ''}`}>
           <h1 className="slide-title">{slide.title}</h1>
           {slide.subtitle && <h2 className="slide-subtitle">{slide.subtitle}</h2>}
-          
-          {slide.content && (
-            <ul className="slide-list">
-              {slide.content.map((item, index) => (
-                <li key={index}>{item}</li>
-              ))}
-            </ul>
-          )}
+
+          {slide.content &&
+            (mermaidChart ? (
+              <div className="slide-mermaid">
+                <MermaidChart chart={mermaidChart} chartKey={currentSlide} />
+              </div>
+            ) : (
+              <ul className="slide-list">
+                {slide.content.map((item, index) => (
+                  <li key={index}>
+                    <pre style={{ whiteSpace: 'pre-wrap', margin: 0 }}>
+                      {item}
+                    </pre>
+                  </li>
+                ))}
+              </ul>
+            ))}
         </div>
       </div>
 

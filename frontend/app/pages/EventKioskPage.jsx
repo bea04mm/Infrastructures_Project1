@@ -14,8 +14,7 @@ import {
   TextField,
   Typography
 } from "@mui/material"
-
-const API_URL = "http://localhost:8000"
+import { API_URL } from "../apiConfig"
 
 function formatDate(value) {
   return new Intl.DateTimeFormat("en-GB", {

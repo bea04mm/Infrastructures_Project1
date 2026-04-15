@@ -23,8 +23,7 @@ import {
 import OpenInNewIcon from "@mui/icons-material/OpenInNew"
 import { authHeaders, clearToken } from "../auth"
 import { useNavigate } from "react-router-dom"
-
-const API_URL = "http://localhost:8000"
+import { API_URL } from "../apiConfig"
 
 function formatDateTime(value) {
   return new Intl.DateTimeFormat("en-GB", {
@@ -82,7 +81,6 @@ export default function EventLogsPage() {
   }
 
   async function loadGuestLogs(eventId) {
-    setSelectedEventId(eventId)
     setLoading(true)
     setError("")
     try {
@@ -117,6 +115,7 @@ export default function EventLogsPage() {
   function handleEventChange(event) {
     const eventId = event.target.value
     if (eventId) {
+      setSelectedEventId(eventId)
       loadGuestLogs(eventId)
     } else {
       setSelectedEventId(null)
@@ -222,7 +221,6 @@ export default function EventLogsPage() {
                       key={guest.id}
                       hover
                       sx={{
-                        bgcolor: guest.is_connected ? "success.light" : "grey.50",
                         "&:hover": { bgcolor: "action.hover" },
                       }}
                     >

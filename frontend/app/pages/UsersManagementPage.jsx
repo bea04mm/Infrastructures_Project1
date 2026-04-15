@@ -30,8 +30,7 @@ import AddIcon from "@mui/icons-material/Add"
 import CloseIcon from "@mui/icons-material/Close"
 import { authHeaders, clearToken } from "../auth"
 import { useNavigate } from "react-router-dom"
-
-const API_URL = "http://localhost:8000"
+import { API_URL } from "../apiConfig"
 
 export default function UsersManagementPage() {
   const navigate = useNavigate()

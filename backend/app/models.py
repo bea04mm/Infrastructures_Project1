@@ -1,3 +1,4 @@
+from datetime import datetime
 from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 from .database import Base
@@ -18,8 +19,8 @@ class Event(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    start_date: Mapped[str] = mapped_column(DateTime(timezone=True), nullable=False)
-    end_date: Mapped[str] = mapped_column(DateTime(timezone=True), nullable=False)
+    start_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    end_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     usergroup_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 
 
@@ -32,9 +33,9 @@ class Guest(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     xiq_end_user_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True, index=True)
-    joined_at: Mapped[str] = mapped_column(DateTime(timezone=True), nullable=False)
+    joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     is_connected: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    last_activity_at: Mapped[str | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_activity_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class WebhookSubscription(Base):
@@ -44,5 +45,5 @@ class WebhookSubscription(Base):
     xiq_subscription_id: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     message_type: Mapped[str] = mapped_column(String(50), nullable=False)
     webhook_url: Mapped[str] = mapped_column(String(500), nullable=False)
-    created_at: Mapped[str] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

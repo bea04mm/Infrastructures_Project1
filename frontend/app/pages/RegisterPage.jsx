@@ -2,8 +2,7 @@ import React, { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { Box, Button, Container, Paper, Stack, TextField, Typography, Alert, CircularProgress } from "@mui/material"
 import { authHeaders, clearToken } from "../auth"
-
-const API_URL = "http://localhost:8000"
+import { API_URL } from "../apiConfig"
 
 export default function RegisterPage() {
   const navigate = useNavigate()

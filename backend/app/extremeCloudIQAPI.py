@@ -34,7 +34,9 @@ class ExtremeCloudIQAPI:
             print("Logout failed.")
 
     def _make_request(self, endpoint, method, data=None): # Implemented
-        headers = {}
+        headers = {
+            "ngrok-skip-browser-warning": "true"
+        }
         if self.access_token:
             headers["Authorization"] = f"Bearer {self.access_token}"
 
@@ -780,6 +782,107 @@ class ExtremeCloudIQAPI:
         except Exception as e:
             print(f"Error importing PPSK: {e}")
 
+    def create_webhook_subscription(self, webhook_url, secret="event-kiosk-webhook"):
+        """Create a webhook subscription for authentication logs"""
+        endpoint = "subscriptions/webhook"
+        data = [
+            {
+                "url": webhook_url,
+                "secret": secret,
+                "message_type": "AUTHENTICATION_LOG_ALL",
+                "application": "event-kiosk",
+                "status": "ENABLED"
+            }
+        ]
+        response = self._make_request(endpoint, "POST", data)
+
+        if response.status_code in (200, 201, 202):
+            try:
+                # Handle empty response (sometimes 202 returns no body)
+                if not response.text or response.text.strip() == "":
+                    print(f"Webhook subscription accepted (status {response.status_code}) with no response body. Fetching subscription list...")
+                    subscriptions = self.list_webhook_subscriptions()
+                    if subscriptions:
+                        for sub in subscriptions:
+                            if sub.get("url") == webhook_url and sub.get("message_type") == "AUTHENTICATION_LOG_ALL":
+                                subscription_id = sub.get("id")
+                                print(f"Webhook subscription found with ID: {subscription_id}")
+                                return subscription_id
+                    print("Webhook subscription accepted but unable to retrieve ID from list")
+                    return "pending"
+                
+                response_data = response.json()
+                # XIQ returns the subscription ID in the response
+                subscription_id = response_data.get("id")
+                
+                # If no ID in response, try to extract from list response
+                if not subscription_id and isinstance(response_data, list) and len(response_data) > 0:
+                    subscription_id = response_data[0].get("id")
+                
+                # If still no ID, get subscriptions and find by URL
+                if not subscription_id:
+                    subscriptions = self.list_webhook_subscriptions()
+                    if subscriptions:
+                        for sub in subscriptions:
+                            if sub.get("url") == webhook_url:
+                                subscription_id = sub.get("id")
+                                break
+                
+                if subscription_id:
+                    print(f"Webhook subscription created with ID: {subscription_id}")
+                    return subscription_id
+                else:
+                    print(f"Webhook subscription accepted but no ID returned. Response: {response.text}")
+                    return "pending"
+            except Exception as e:
+                print(f"Error parsing webhook response: {e}")
+                print(f"Response text: {response.text}")
+                # Try to fetch from subscriptions list as fallback
+                try:
+                    subscriptions = self.list_webhook_subscriptions()
+                    if subscriptions:
+                        for sub in subscriptions:
+                            if sub.get("url") == webhook_url and sub.get("message_type") == "AUTHENTICATION_LOG_ALL":
+                                subscription_id = sub.get("id")
+                                print(f"Webhook subscription recovered from list with ID: {subscription_id}")
+                                return subscription_id
+                except:
+                    pass
+                return None
+                print(f"Response text: {response.text}")
+                return None
+        else:
+            print(f"Failed to create webhook subscription. Status code: {response.status_code}")
+            print(response.text)
+            return None
+
+    def delete_webhook_subscription(self, subscription_id):
+        """Delete a webhook subscription"""
+        endpoint = f"subscriptions/webhook/{subscription_id}"
+        response = self._make_request(endpoint, "DELETE")
+
+        if response.status_code in (200, 201, 204):
+            print(f"Webhook subscription {subscription_id} deleted successfully")
+            return True
+        else:
+            print(f"Failed to delete webhook subscription {subscription_id}. Status code: {response.status_code}")
+            print(response.text)
+            return False
+
+    def list_webhook_subscriptions(self):
+        """Retrieve all webhook subscriptions"""
+        endpoint = "subscriptions/webhook"
+        response = self._make_request(endpoint, "GET")
+
+        if response.status_code == 200:
+            subscriptions = response.json().get("data", [])
+            print(f"Retrieved {len(subscriptions)} webhook subscriptions")
+            return subscriptions
+        else:
+            print(f"Failed to retrieve webhook subscriptions. Status code: {response.status_code}")
+            print(response.text)
+            return None
+
 if __name__ == "__main__":
     username = "student05@rcsecurenetworks.com"
     password = "Training6005"
@@ -847,40 +950,3 @@ if __name__ == "__main__":
     api.import_ppsk_from_csv(csv_file_path)
 
     api.logout()
-
-    def create_webhook_subscription(self, webhook_url, secret="event-kiosk-webhook"):
-        """Create a webhook subscription for authentication logs"""
-        endpoint = "subscriptions/webhook"
-        data = [
-            {
-                "application": "event-kiosk",
-                "url": webhook_url,
-                "secret": secret,
-                "message_type": "AUTHENTICATION_LOG_ALL"
-            }
-        ]
-        response = self._make_request(endpoint, "POST", data)
-
-        if response.status_code in (200, 201):
-            response_data = response.json()
-            # XIQ returns the subscription ID in the response
-            subscription_id = response_data.get("id") or response_data[0].get("id") if isinstance(response_data, list) else None
-            print(f"Webhook subscription created with ID: {subscription_id}")
-            return subscription_id
-        else:
-            print(f"Failed to create webhook subscription. Status code: {response.status_code}")
-            print(response.text)
-            return None
-
-    def delete_webhook_subscription(self, subscription_id):
-        """Delete a webhook subscription"""
-        endpoint = f"subscriptions/webhook/{subscription_id}"
-        response = self._make_request(endpoint, "DELETE")
-
-        if response.status_code in (200, 201, 204):
-            print(f"Webhook subscription {subscription_id} deleted successfully")
-            return True
-        else:
-            print(f"Failed to delete webhook subscription {subscription_id}. Status code: {response.status_code}")
-            print(response.text)
-            return False

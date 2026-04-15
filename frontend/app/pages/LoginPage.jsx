@@ -2,8 +2,7 @@ import React, { useState, useEffect } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { Box, Button, Container, Paper, Stack, TextField, Typography, Alert } from "@mui/material"
 import { setToken, setCurrentUser, authHeaders } from "../auth"
-
-const API_URL = "http://localhost:8000"
+import { API_URL } from "../apiConfig"
 
 export default function LoginPage() {
   const navigate = useNavigate()

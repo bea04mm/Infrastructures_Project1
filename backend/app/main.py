@@ -28,7 +28,12 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost",
+        "http://localhost:80",
+        "https://suited-quail-thankful.ngrok-free.app",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -294,6 +299,43 @@ def init_scheduler():
 
 
 scheduler = init_scheduler()
+
+# Add job to detect disconnections by timeout (check every 1 minute)
+def check_wifi_timeout():
+    """Check for guests that have been inactive for more than 5 minutes and mark as disconnected"""
+    db = SessionLocal()
+    try:
+        from datetime import timedelta
+        timeout_minutes = 5
+        cutoff_time = datetime.now(timezone.utc) - timedelta(minutes=timeout_minutes)
+        
+        # Find guests that are marked as connected but haven't had activity in the timeout period
+        inactive_guests = db.query(models.Guest).filter(
+            models.Guest.is_connected == True,
+            models.Guest.last_activity_at < cutoff_time
+        ).all()
+        
+        if inactive_guests:
+            print(f"[TIMEOUT] Found {len(inactive_guests)} guests inactive for >{timeout_minutes}min")
+            for guest in inactive_guests:
+                guest.is_connected = False
+                db.commit()
+                print(f"[TIMEOUT] Marked {guest.email} as DISCONNECTED")
+    except Exception as e:
+        print(f"[TIMEOUT] Error checking for timeouts: {str(e)}")
+    finally:
+        db.close()
+
+# Schedule the timeout check to run every 30 seconds
+scheduler.add_job(
+    check_wifi_timeout,
+    'interval',
+    seconds=30,
+    id='wifi_timeout_check',
+    name='WiFi Timeout Check',
+    replace_existing=True
+)
+print("[STARTUP] WiFi timeout checker scheduled (every 30 seconds)")
 
 
 @app.on_event("shutdown")
@@ -722,10 +764,13 @@ class WebhookAuthenticationPayload(BaseModel):
 def handle_authentication_webhook(payload: list[WebhookAuthenticationPayload], db: Session = Depends(get_db)):
     """
     Webhook endpoint to receive authentication events from ExtremeCloudIQ.
-    Code 10001 = Login, Code 10002 = Logout
+    If userName is present, the user is connected to WiFi.
     """
+    updated_guests = []
+    
     for event in payload:
-        if not event.userName:
+        # Skip events with no userName (system events/heartbeats)
+        if not event.userName or event.userName.strip() == "":
             continue
         
         normalized_email = event.userName.strip().lower()
@@ -736,15 +781,20 @@ def handle_authentication_webhook(payload: list[WebhookAuthenticationPayload], d
             print(f"[WEBHOOK] No guest found for email: {normalized_email}")
             continue
         
-        # Code 10001 = Login, Code 10002 = Logout
-        if event.code == 10001:
-            guest.is_connected = True
-        elif event.code == 10002:
-            guest.is_connected = False
-        
+        # If we're receiving an event with userName, the user is connected
+        guest.is_connected = True
         guest.last_activity_at = datetime.fromtimestamp(event.timeStamp / 1000, tz=timezone.utc) if event.timeStamp else datetime.now(timezone.utc)
-        db.commit()
-        print(f"[WEBHOOK] Updated guest {normalized_email}: connected={guest.is_connected}")
+        updated_guests.append(guest)
+        print(f"[WEBHOOK] Updated user {normalized_email}: connected=True, last_activity={guest.last_activity_at}")
+    
+    # Commit all changes at once
+    if updated_guests:
+        try:
+            db.commit()
+            print(f"[WEBHOOK] Successfully committed {len(updated_guests)} guest updates")
+        except Exception as e:
+            print(f"[WEBHOOK] Error committing changes: {str(e)}")
+            db.rollback()
     
     return {"status": "received"}
 
@@ -768,7 +818,7 @@ def register_webhook(
             detail="ExtremeCloudIQ credentials are not configured"
         )
     
-    # Check if webhook is already registered
+    # Check if webhook is already registered in database
     existing_subscription = db.query(models.WebhookSubscription).filter(
         models.WebhookSubscription.message_type == "AUTHENTICATION_LOG_ALL",
         models.WebhookSubscription.is_active == True
@@ -794,6 +844,22 @@ def register_webhook(
     if not subscription_id:
         raise HTTPException(status_code=502, detail="Failed to create webhook subscription")
     
+    # Check if subscription already exists (duplicate prevention)
+    if subscription_id == "pending":
+        # Webhook accepted but no ID yet - try to retrieve from list
+        api.login()
+        subscriptions = api.list_webhook_subscriptions()
+        api.logout()
+        
+        if subscriptions:
+            for sub in subscriptions:
+                if sub.get("url") == webhook_url and sub.get("message_type") == "AUTHENTICATION_LOG_ALL":
+                    subscription_id = sub.get("id")
+                    break
+        
+        if subscription_id == "pending":
+            raise HTTPException(status_code=502, detail="Webhook accepted but unable to retrieve subscription ID")
+    
     # Store subscription in database
     webhook_sub = models.WebhookSubscription(
         xiq_subscription_id=str(subscription_id),
@@ -806,6 +872,7 @@ def register_webhook(
     db.commit()
     db.refresh(webhook_sub)
     
+    print(f"[WEBHOOK] New webhook subscription registered with ID: {subscription_id}")
     return {
         "status": "registered",
         "subscription_id": subscription_id

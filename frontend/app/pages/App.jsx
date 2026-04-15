@@ -18,8 +18,7 @@ import EventModal from "../components/EventModal";
 import EventDetailModal from "../components/EventDetailModal";
 import ConfirmModal from "../components/ConfirmModal";
 import { authHeaders, clearToken, getCurrentUser } from "../auth";
-
-const API_URL = "http://localhost:8000";
+import { API_URL } from "../apiConfig";
 
 const schedulerState = {
   options: {

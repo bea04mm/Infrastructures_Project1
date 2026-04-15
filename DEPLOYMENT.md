@@ -6,7 +6,7 @@
 - Docker Compose 2.0+
 - Git
 - 2GB minimum RAM available
-- Ports available: 5432 (PostgreSQL), 8000 (Backend API), 5173 (Frontend)
+- Ports available: 80 (Nginx reverse proxy), 5432 (PostgreSQL internal only)
 
 ## Environment Setup
 
@@ -26,44 +26,48 @@ Create a `.env` file in the project root:
 BACKEND_PORT=8000
 FRONTEND_URL=http://localhost:5173
 
-# Database Configuration
-POSTGRES_HOST=kiosk_postgres
-POSTGRES_PORT=5432
-POSTGRES_DB=event_kiosk
-POSTGRES_USER=kiosk_user
-POSTGRES_PASSWORD=secure_postgres_password_123
+# Backend Database Configuration
+DATABASE_URL=postgresql+psycopg2://postgres:postgres@db:5432/event_kiosk
 
 # JWT Configuration
-JWT_SECRET_KEY=your-super-secret-jwt-key-change-this-in-production
-JWT_ALGORITHM=HS256
-JWT_EXPIRATION_HOURS=24
+SECRET_KEY=your-super-secret-jwt-key-change-this-in-production
 
 # ExtremeCloudIQ Configuration
 XIQ_USERNAME=your_xiq_username
 XIQ_PASSWORD=your_xiq_password
-XIQ_HOST=api.extremecloudiq.com
 
-# SSID Configuration
+# SSID Configuration (choose one)
 XIQ_SSID_ID=123456789
 # OR
 XIQ_SSID_NAME=YourSSIDName
 
-# Webhook Configuration (Optional)
-WEBHOOK_SECRET=your-webhook-secret-key
+# Webhook Configuration
+WEBHOOK_URL=https://your-public-domain.com/webhooks/authentication
 ```
 
 ### 3. Important Notes on Environment Variables
 
 **Production Considerations:**
-- Change `JWT_SECRET_KEY` to a strong, random value
-- Use a password manager for `POSTGRES_PASSWORD` and XIQ credentials
+- Change `SECRET_KEY` to a strong, random value
+- Never expose XIQ credentials in version control
 - Never commit `.env` file to version control
-- For production, use environment variable management service
+- Never share `SECRET_KEY` publicly
+
+**Database URL Format:**
+- Connection string is in `DATABASE_URL` variable
+- Format: `postgresql+psycopg2://user:password@host:port/database`
+- If connecting from outside Docker: use `localhost`
+- If connecting inside Docker: use `db` (service name)
 
 **XIQ Configuration:**
 - Either provide `XIQ_SSID_ID` OR `XIQ_SSID_NAME` (not both required, but at least one)
 - ID-based lookup is faster than name-based lookup
 - Verify credentials work with XIQ API before deployment
+
+**Webhook Configuration:**
+- `WEBHOOK_URL` must be publicly accessible from ExtremeCloudIQ servers
+- Use HTTPS in production
+- For ngrok tunnel testing: use your public ngrok URL
 
 ## Local Development
 
@@ -79,31 +83,55 @@ docker compose ps
 
 **Expected Output:**
 ```
-NAME                COMMAND                  SERVICE   STATUS      PORTS
-kiosk_postgres      postgres                 postgres  Up (healthy) 0.0.0.0:5432->5432/tcp
-project1-backend-1  uvicorn app.main:app... backend   Up           0.0.0.0:8000->8000/tcp
-project1-frontend-1 npm run dev              frontend  Up           0.0.0.0:5173->5173/tcp
+NAME                    COMMAND                  SERVICE   STATUS      PORTS
+nginx_reverse_proxy     nginx -g daemon off...   nginx     Up          0.0.0.0:80->80/tcp
+project1-frontend-1     npm run dev              frontend  Up          
+project1-backend-1      uvicorn app.main:app...  backend   Up          
+kiosk_postgres          postgres                 db        Up (healthy) 0.0.0.0:5432->5432/tcp
 ```
+
+**Service Architecture:**
+- **nginx**: Reverse proxy on port 80 (public)
+- **frontend**: React dev server on port 5173 (internal, accessed via nginx)
+- **backend**: FastAPI on port 8000 (internal, accessed via nginx)
+- **db**: PostgreSQL on port 5432 (internal, requires authentication)
 
 ### Access Services
 
+**Via Nginx (recommended in docker compose):**
+- **Frontend**: http://localhost
+- **Backend API**: http://localhost/api/
+- **API Documentation**: http://localhost/api/docs
+
+**Direct Access (development only):**
 - **Frontend**: http://localhost:5173
 - **Backend API**: http://localhost:8000
 - **API Documentation**: http://localhost:8000/docs
-- **Database**: localhost:5432 (connection string below)
+- **Database**: localhost:5432
 
 ### Database Connection
 
 From local machine:
 ```
-postgresql://kiosk_user:secure_postgres_password_123@localhost:5432/event_kiosk
+psql -h localhost -U postgres -d event_kiosk
 ```
+
+Connection string format:
+```
+postgresql://postgres:postgres@localhost:5432/event_kiosk
+```
+
+Default credentials:
+- **Username**: postgres
+- **Password**: postgres
+- **Database**: event_kiosk
+- **Port**: 5432
 
 ### Seed Admin User
 
 Admin user is automatically created on first start:
-- **Email**: admin@example.com
-- **Password**: admin123
+- **Email**: admin@gmail.com
+- **Password**: admin
 
 To reset:
 ```bash
@@ -141,7 +169,8 @@ docker compose logs -f
 ```bash
 docker compose logs -f backend
 docker compose logs -f frontend
-docker compose logs -f postgres
+docker compose logs -f nginx
+docker compose logs -f db
 ```
 
 **Real-time Backend Logs:**
@@ -204,7 +233,8 @@ sudo nano .env
 
 ### 3. SSL/TLS Configuration
 
-For production, set up HTTPS with nginx reverse proxy:
+For production, the nginx reverse proxy in docker-compose.yml handles routing.
+To add HTTPS, modify nginx.conf:
 
 ```nginx
 server {
@@ -214,19 +244,30 @@ server {
     ssl_certificate /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
     
-    # Frontend
+    # Frontend - root path
     location / {
-        proxy_pass http://localhost:5173;
+        proxy_pass http://frontend:5173;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
     }
     
     # Backend API
-    location /api {
-        proxy_pass http://localhost:8000;
+    location /api/ {
+        proxy_pass http://backend:8000/;
+        proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+    
+    # Webhooks
+    location /webhooks/ {
+        proxy_pass http://backend:8000/webhooks/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
 
@@ -251,8 +292,8 @@ BACKUP_FILE="$BACKUP_DIR/event_kiosk_$TIMESTAMP.sql.gz"
 
 mkdir -p $BACKUP_DIR
 
-docker compose exec -T postgres pg_dump \
-  -U kiosk_user \
+docker compose exec -T db pg_dump \
+  -U postgres \
   -d event_kiosk | gzip > $BACKUP_FILE
 
 # Keep only last 7 backups
@@ -274,10 +315,8 @@ Schedule with crontab:
 ls -la /backups/event-kiosk/
 
 # Restore from backup
-docker compose exec -T postgres pg_restore \
-  -U kiosk_user \
-  -d event_kiosk \
-  /backups/event-kiosk/event_kiosk_20260410_140000.sql.gz
+gunzip -c /backups/event-kiosk/event_kiosk_20260410_140000.sql.gz | \
+docker compose exec -T db psql -U postgres -d event_kiosk
 ```
 
 ### 5. Health Monitoring
@@ -285,14 +324,14 @@ docker compose exec -T postgres pg_restore \
 **Status Check Endpoint:**
 
 ```bash
-# Backend health
-curl http://localhost:8000/docs
+# Backend health (via nginx)
+curl http://localhost/api/docs
 
-# Frontend accessible
-curl -I http://localhost:5173
+# Frontend accessible (via nginx)
+curl -I http://localhost
 
 # Database connection
-docker compose exec postgres pg_isready -U kiosk_user
+docker compose exec db pg_isready -U postgres
 ```
 
 **Monitoring with systemd:**

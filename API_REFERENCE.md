@@ -2,17 +2,27 @@
 
 ## Base URL
 
+**Development:**
 ```
 http://localhost:8000
 ```
 
+**Production (via Nginx):**
+```
+http://localhost/api
+```
+
 ## Authentication
 
-All endpoints (except authentication) require a Bearer token in the `Authorization` header:
+All endpoints (except `/auth/register` and `/auth/login`) require a Bearer token in the `Authorization` header:
 
 ```
 Authorization: Bearer <JWT_TOKEN>
 ```
+
+**Token Expiration:** 24 hours
+
+**Token Storage:** localStorage (frontend) as `accessToken`
 
 ## Events Endpoints
 

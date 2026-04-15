@@ -40,9 +40,10 @@ docker compose up -d --build
 ```
 
 **Access Points:**
-- **Frontend**: http://localhost:5173
-- **Backend API**: http://localhost:8000
-- **Database**: localhost:5432
+- **Frontend**: http://localhost (via nginx)
+- **Backend API**: http://localhost/api/ (via nginx)
+- **Webhooks**: http://localhost/webhooks/ (via nginx)
+- **Database**: localhost:5432 (internal only)
 
 ## 👤 Default Admin Credentials
 
@@ -74,9 +75,10 @@ When an event ends, the system autonomously:
 
 | Layer | Technology |
 |-------|-----------|
+| **Reverse Proxy** | Nginx (Alpine) |
 | **Frontend** | React 18 + Vite + Material-UI |
 | **Backend** | FastAPI + Python 3.12 |
-| **Database** | PostgreSQL |
+| **Database** | PostgreSQL 16 (Alpine) |
 | **Containers** | Docker & Docker Compose |
 | **Security** | JWT + bcrypt + HTTPS-ready |
 

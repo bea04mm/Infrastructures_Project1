@@ -36,15 +36,14 @@ netstat -tulpn | grep LISTEN
 
 ```bash
 # Find which process is using the port
-sudo lsof -i :8000
+sudo lsof -i :80
 sudo lsof -i :5432
-sudo lsof -i :5173
 
 # Option 1: Stop that process
 sudo kill -9 <PID>
 
 # Option 2: Change port in docker-compose.yml
-# Change "8000:8000" to "9000:8000" for example
+# Change "80:80" to "8080:80" for nginx
 ```
 
 ### Out of Memory
@@ -74,16 +73,16 @@ free -h
 
 ```bash
 # 1. Check if PostgreSQL container is running
-docker compose ps postgres
+docker compose ps db
 
 # 2. Check logs
-docker compose logs postgres
+docker compose logs db
 
-# 3. Verify credentials in .env
-grep POSTGRES_ .env
+# 3. Verify DATABASE_URL in .env
+grep DATABASE_URL .env
 
 # 4. Test connection from host
-psql -h localhost -U kiosk_user -d event_kiosk -c "SELECT 1"
+psql -h localhost -U postgres -d event_kiosk -c "SELECT 1"
 
 # 5. Test from backend container
 docker compose exec backend python -c "

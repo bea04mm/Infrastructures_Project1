@@ -70,7 +70,7 @@ cd frontend
 npm install
 npm run dev
 
-# Access at http://localhost:5173
+# Access at http://localhost:5173 (direct) or http://localhost (via nginx in docker compose)
 ```
 
 ### Build for Production
@@ -92,7 +92,12 @@ tar -czf ../frontend.tar.gz .
 Create `frontend/.env`:
 
 ```env
+# Development
 VITE_API_URL=http://localhost:8000
+
+# Production (via nginx)
+VITE_API_URL=http://localhost/api
+
 VITE_JWT_EXPIRATION=24
 VITE_DEFAULT_LANGUAGE=en
 ```

@@ -64,7 +64,7 @@ const slides = [
       'Sistema completo de gestão de eventos com auto-registo automático',
       'Integração com ExtremeCloudIQ para controlo de acesso WiFi',
       'Interface pública simples para registo sem necessidade de login',
-      'Geração instantânea de credenciais de rede para convidados',
+      'Criação instantânea de credenciais de rede para convidados',
       'Revogação automática de acesso quando eventos terminam',
       'Dashboard de administração para gestão centralizada'
     ]
@@ -85,8 +85,10 @@ const slides = [
     content: [
       'Frontend: React 18 + Vite para uma interface reactiva',
       'Backend: FastAPI + Python 3.12',
-      'Base de Dados: PostgreSQL para persistencia dos dados',
-      'Containerização: Docker e Docker Compose',
+      'Base de Dados: PostgreSQL para persistência dos dados',
+      'Reverse Proxy: Nginx para encaminhamento centralizado e load balancing',
+      'Containerização: Docker e Docker Compose para orquestração',
+      'Tunneling: ngrok para expor aplicação local ao público',
       'API RESTful com autenticação segura e encriptação de senhas',
       'Integração em tempo real com webhooks do ExtremeCloudIQ'
     ]
@@ -147,23 +149,18 @@ const slides = [
   {
     title: 'Funcionalidades Principais',
     content: [
-      'Calendário com 4 visualizações: Dia, Semana, Mês e Timeline',
-      'Gestão de utilizadores com diferentes níveis de permissão',
+      'Calendário Mensal',
+      'Gestão de utilizadores',
       'Limpeza automática programada para eventos expirados',
       'Interface responsiva e funcional em computador e telemóvel',
-      'Integração com eventos de autenticação do ExtremeCloudIQ',
-      'Histórico completo de convidados e rastreamento de acessos'
+      'Histórico de convidados'
     ]
   },
   {
     title: 'Segurança e Proteção de Dados',
     content: [
       'Autenticação com tokens seguros com validade configurável',
-      'Senhas protegidas com encriptação bcrypt e sal automático',
-      'Validação rigorosa de todos os dados de entrada do utilizador',
-      'Controlo de acesso por funções: Administrador e Utilizador',
-      'Credenciais sensíveis armazenadas em variáveis de ambiente',
-      'Proteção contra injeções de código e acessos não autorizados'
+      'Senhas protegidas com encriptação bcrypt',
     ]
   },
   {
@@ -185,18 +182,14 @@ const slides = [
       'Tabela de convidados: registo completo por evento',
       'Tabela de integrações: configurações do ExtremeCloudIQ',
       'Índices otimizados para consultas rápidas e eficientes',
-      'Backup automático e recuperação de dados disponível'
     ]
   },
   {
     title: 'Implantação e Operação',
     content: [
-      'Docker Compose para orquestração local e em produção',
-      'Variáveis de ambiente para configuração de segurança',
+      'Docker Compose',
       'Registos estruturados para diagnóstico e monitorização',
-      'Verificações automáticas de saúde de todos os serviços',
       'Armazenamento persistente de dados com volumes Docker',
-      'Pronto para implantação em servidores cloud'
     ]
   },
   {
@@ -206,7 +199,7 @@ const slides = [
       'Eliminação de erros na configuração de acesso WiFi',
       'Experiência do utilizador fluida, rápida e intuitiva',
       'Limpeza automática elimina trabalho manual repetitivo',
-      'Capacidade de gerir centenas de eventos em simultâneo',
+      'Capacidade de gerir vários eventos em simultâneo',
       'Retorno de investimento rápido através da automatização'
     ]
   },

@@ -90,12 +90,6 @@ export default function LoginPage() {
               disabled={loading}
             />
 
-            <Stack direction="row" justifyContent="space-between" alignItems="center">
-              <Typography variant="body2" color="text.secondary">
-                Default: admin@gmail.com / admin
-              </Typography>
-            </Stack>
-
             <Button type="submit" variant="contained" fullWidth disabled={loading}>
               {loading ? "Signing in..." : "Sign in"}
             </Button>
